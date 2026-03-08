@@ -1,14 +1,16 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, UploadFile
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import List
+import httpx
+import sqlite3
+import os
+import uuid
 
 # Импортируем функции из наших сервисов
-from backend.services.db_crud import search_products
-from backend.services.outfit_generator import load_wardrobe_from_db, generate_outfits, SCENARIOS, STYLES
+from backend.services.outfit_generator import load_wardrobe_from_db, insert_user_wardrobe_item
 from backend.services.rag_agent import generate_outfit_via_llm
 
 app = FastAPI(title="StyleMate API")
@@ -21,79 +23,131 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Модель запроса для генерации лука
 class OutfitRequest(BaseModel):
     scenario: str
     style: str
-    count: int = 3
+    count: int = 1
 
-# Монтируем папку с фронтендом как статику
 app.mount("/static", StaticFiles(directory="frontend_tma"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
-    # Читаем и отдаем наш index.html прямо из корня
     with open("frontend_tma/index.html", "r", encoding="utf-8") as f:
         return f.read()
-
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "message": "StyleMate Backend is running!"}
 
-@app.get("/api/wardrobe", response_model=List[dict])
-async def get_wardrobe(limit: int = 50):
-    try:
-        rows = search_products(query="", limit=limit, db_path="products.db")
-        items = []
-        for (pid, source, title, price, url, image_url, cat, col) in rows:
-            items.append({
-                "id": pid, "title": title, "price": price, 
-                "url": url, "image_url": image_url, 
-                "category": cat, "color": col
-            })
-        return items
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/upload_clothing")
-async def upload_clothing():
-    # Заглушка для Артема
-    return {"status": "success", "item_type": "jeans", "color": "blue"}
-
 @app.post("/api/generate_outfits")
 async def api_generate_outfits(req: OutfitRequest):
-    # 1. Берем гардероб из БД
-    wardrobe = load_wardrobe_from_db(db_path="products.db")
+    wardrobe = load_wardrobe_from_db(db_path="database/wardrobe.db")
     if not wardrobe:
         raise HTTPException(status_code=404, detail="Wardrobe is empty")
 
-    # Убираем аксессуары, берем только основные вещи (ограничиваем до 100)
     wardrobe_view = [{"id": x.id, "title": x.title, "category": x.cat, "color": x.color, "price": x.price, "image_url": x.image_url} for x in wardrobe if x.cat != "accessory"][:100]
 
-    # 2. ПРОСИМ НЕЙРОСЕТЬ СОБРАТЬ ЛУК (RAG)
     print(f"Отправляю запрос в Qwen... Сценарий: {req.scenario}")
     llm_response = generate_outfit_via_llm(wardrobe_view, req.scenario, req.style)
     
-    # 3. Достаем вещи по ID, которые вернула нейросеть
     selected_ids = llm_response.get("item_ids", [])
     outfit_items = [item for item in wardrobe_view if item["id"] in selected_ids]
     
-    # Если нейросеть ничего не вернула (сбой), отдаем хотя бы одну заглушку, чтобы фронт не падал
     if not outfit_items:
         print("Внимание: Нейросеть не смогла собрать лук, отдаем fallback")
-        # Берем первые 3 вещи из базы просто как резервный вариант
         outfit_items = wardrobe_view[:3]
         explanation = "Нейросеть устала, вот случайные вещи из твоего гардероба."
     else:
         explanation = llm_response.get("explanation", "Мой выбор для тебя")
 
-    # 4. Формируем ответ для фронтенда
     result = [{
         "score": 100, 
-        "explanation": explanation, # Добавили поле с текстом нейросети
-        "items": outfit_items       # Фронтенд Ильяса ждет массив словарей именно здесь
+        "explanation": explanation,
+        "items": outfit_items
     }]
 
     return {"scenario": req.scenario, "style": req.style, "outfits": result}
+@app.get("/api/my_wardrobe")
+async def get_my_wardrobe():
+    """Возвращает вещи, которые пользователь загрузил сам."""
+    try:
+        con = sqlite3.connect("database/wardrobe.db")
+        cur = con.cursor()
+        # Берем данные из личной таблицы пользователя
+        cur.execute("SELECT id, title, category, color, image_url FROM user_wardrobe ORDER BY id DESC")
+        rows = cur.fetchall()
+        con.close()
+        
+        items = []
+        for r in rows:
+            items.append({
+                "id": r[0],
+                "title": r[1],
+                "category": r[2],
+                "color": r[3],
+                "image_url": r[4]
+            })
+        return items
+    except Exception as e:
+        print(f"Ошибка при получении гардероба: {e}")
+        return []
+    
+import os
+import uuid # Добавь в импорты наверху, если нет
 
+@app.post("/api/upload_clothing")
+async def upload_clothing(file: UploadFile = File(...)):
+    ARTEM_MICROSERVICE_URL = "https://ayomg-185-122-185-121.a.free.pinggy.link/analyze_image"
+    
+    try:
+        # 1. Читаем файл
+        image_bytes = await file.read()
+        
+        # 2. Сохраняем файл локально, чтобы его можно было показать во фронтенде!
+        # Генерируем уникальное имя, чтобы файлы не перезаписывали друг друга
+        file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+        unique_filename = f"{uuid.uuid4().hex}.{file_ext}"
+        save_path = os.path.join("frontend_tma", "uploads", unique_filename)
+        
+        with open(save_path, "wb") as f:
+            f.write(image_bytes)
+            
+        # Формируем публичную ссылку, по которой фронтенд сможет открыть эту картинку
+        public_image_url = f"/static/uploads/{unique_filename}"
+        
+        # 3. Отправляем картинку Артему для анализа
+        print(f"Отправляю картинку '{unique_filename}' на 5070 Ti Артему...")
+        async with httpx.AsyncClient() as client:
+            files = {'file': (file.filename, image_bytes, file.content_type)}
+            response = await client.post(
+                ARTEM_MICROSERVICE_URL, 
+                files=files, 
+                timeout=60.0,
+                follow_redirects=True
+            )
+            
+            if response.status_code != 200:
+                print(f"Сервер Артема вернул ошибку: {response.text}")
+                # Даже если Артем недоступен, мы всё равно сохраняем вещь с картинкой!
+                insert_user_wardrobe_item(title="Новая вещь", category="unknown", color="unknown", image_url=public_image_url)
+                return {"status": "success", "message": "Сохранено без ИИ"}
+                
+            ai_data = response.json()
+            
+            # 4. Сохраняем в БД ВМЕСТЕ С КАРТИНКОЙ
+            cat = ai_data.get('category', 'clothes')
+            col = ai_data.get('color', 'unknown')
+            new_title = f"{str(col).capitalize()} {str(cat).capitalize()}"
+            
+            insert_user_wardrobe_item(title=new_title, category=cat, color=col, image_url=public_image_url)
+            print("Вещь с картинкой успешно сохранена в базу!")
+            
+            return {
+                "status": "success",
+                "message": "Успешно распознано и добавлено!",
+                "ai_analysis": ai_data
+            }
+            
+    except Exception as e:
+        print(f"Ошибка: {e}")
+        return {"status": "error", "message": "Сбой сервера."}

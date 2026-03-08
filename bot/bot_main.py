@@ -30,7 +30,7 @@ async def cmd_start(message: Message):
     )
 
     # Заглушка для Web App (потом замените на ваш боевой домен)
-    web_app_info = WebAppInfo(url="https://iadbc-5-228-131-139.a.free.pinggy.link")
+    web_app_info = WebAppInfo(url="https://skhmo-5-228-131-139.a.free.pinggy.link")
 
     keyboard = InlineKeyboardMarkup(
         inline_keyboard=[

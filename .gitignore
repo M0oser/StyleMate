@@ -15,3 +15,6 @@ __pycache__/
 # Databases
 *.db
 *.sqlite3
+# User uploads
+frontend_tma/uploads/*
+!frontend_tma/uploads/.gitkeep

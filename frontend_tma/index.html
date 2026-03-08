@@ -98,19 +98,7 @@
     </main>
 
     <main id="tab-wardrobe" class="tab-content px-5 py-4">
-        <h2 class="text-3xl font-bold tracking-tight mb-2">Гардероб</h2>
-        <p class="text-gray-600 text-sm font-medium mb-8">Управляй своими цифровыми вещами.</p>
-
-        <div class="bg-white/60 backdrop-blur rounded-3xl border border-white p-10 flex flex-col items-center justify-center text-center shadow-sm">
-            <div class="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-2xl mb-4">📸</div>
-            <h3 class="font-semibold mb-1">Гардероб пуст</h3>
-            <p class="text-gray-500 text-sm mb-6">Добавь вещи, чтобы ИИ смог с ними работать.</p>
-
-            <input type="file" id="native-file-input" accept="image/*" class="hidden">
-            <button onclick="document.getElementById('native-file-input').click()" class="bg-white border border-gray-200 text-fashion font-medium text-sm px-6 py-3 rounded-full shadow-sm active:scale-95 transition-all w-full">
-                + Добавить вещь
-            </button>
-        </div>
+        <!-- Контент гардероба будет загружен через JS -->
     </main>
 
     <main id="tab-favorites" class="tab-content px-5 py-4">
@@ -121,7 +109,7 @@
             <p class="text-gray-500 text-sm">Ты еще ничего не добавил в избранное.</p>
         </div>
         <div id="favorites-grid" class="grid grid-cols-2 gap-x-4 gap-y-6 hidden">
-            </div>
+        </div>
     </main>
 
     <nav class="fixed bottom-0 w-full bg-white/80 backdrop-blur-xl border-t border-gray-100 pb-safe z-50">
@@ -205,6 +193,78 @@
             activeBtn.classList.add('text-fashion', 'scale-110');
 
             if(tabName === 'favorites') renderFavorites();
+            if(tabName === 'wardrobe') loadMyWardrobe(); 
+        }
+
+        async function loadMyWardrobe() {
+            const container = document.querySelector('#tab-wardrobe');
+            
+            try {
+                const response = await fetch('/api/my_wardrobe');
+                const data = await response.json();
+                
+                let html = `
+                    <div class="flex justify-between items-end mb-6">
+                        <div>
+                            <h2 class="text-3xl font-bold tracking-tight mb-2">Мой Гардероб</h2>
+                            <p class="text-gray-600 text-sm font-medium">Твои оцифрованные вещи: ${data.length}</p>
+                        </div>
+                        <button onclick="document.getElementById('native-file-input').click()" class="bg-fashion text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        </button>
+                    </div>
+                `;
+
+                if (data.length === 0) {
+                    html += `
+                    <div class="bg-white/60 backdrop-blur rounded-3xl border border-white p-10 flex flex-col items-center justify-center text-center shadow-sm mt-8">
+                        <div class="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-2xl mb-4">📸</div>
+                        <h3 class="font-semibold mb-1" id="wardrobe-title">Гардероб пуст</h3>
+                        <p class="text-gray-500 text-sm mb-6" id="wardrobe-desc">Добавь вещи, чтобы ИИ смог с ними работать.</p>
+                        <button onclick="document.getElementById('native-file-input').click()" class="bg-white border border-gray-200 text-fashion font-medium text-sm px-6 py-3 rounded-full shadow-sm active:scale-95 transition-all w-full">
+                            + Добавить вещь
+                        </button>
+                    </div>`;
+                } else {
+                    html += `<div class="grid grid-cols-3 gap-3">`;
+                    data.forEach((item, index) => {
+                        let imageHtml = '';
+                        if (item.image_url) {
+                            // Если есть картинка - показываем ее
+                            imageHtml = `<img src="${item.image_url}" class="w-full h-full object-cover rounded-2xl">`;
+                        } else {
+                            // Иначе показываем эмодзи заглушку
+                            let icon = '👕';
+                            const cat = item.category ? item.category.toLowerCase() : '';
+                            if (cat.includes('shoes') || cat.includes('sneakers')) icon = '👟';
+                            if (cat.includes('jeans') || cat.includes('trousers') || cat.includes('shorts')) icon = '👖';
+                            if (cat.includes('jacket') || cat.includes('coat')) icon = '🧥';
+                            imageHtml = `<div class="w-full h-full flex items-center justify-center text-4xl">${icon}</div>`;
+                        }
+
+                        html += `
+                            <div class="group cursor-pointer animate-fade-up flex flex-col items-center" style="animation-delay: ${index * 0.05}s">
+                                <div class="w-full aspect-square bg-white rounded-2xl shadow-sm border border-gray-100 mb-2 relative overflow-hidden">
+                                    ${imageHtml}
+                                </div>
+                                <span class="text-[10px] font-bold text-gray-700 uppercase tracking-tight text-center leading-tight">
+                                    ${item.color || ''} <br> ${item.category || 'вещь'}
+                                </span>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                    html += `<div class="mt-6 text-center"><h3 class="font-semibold mb-1" id="wardrobe-title"></h3><p class="text-gray-500 text-sm" id="wardrobe-desc"></p></div>`;
+                }
+
+                html += `<input type="file" id="native-file-input" accept="image/*" class="hidden">`;
+                container.innerHTML = html;
+                
+                document.getElementById('native-file-input').addEventListener('change', window.handleUpload);
+
+            } catch (error) {
+                console.error("Ошибка загрузки гардероба:", error);
+            }
         }
 
         window.toggleFavorite = function(btn, itemStr) {
@@ -274,14 +334,13 @@
             resultsContainer.classList.add('hidden');
             resultsContainer.innerHTML = '';
 
-                        try {
-                // ИСПРАВЛЕНИЕ: Передаем правильные параметры в бэкенд
+            try {
                 const response = await fetch('/api/generate_outfits', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         scenario: currentScenario,
-                        style: "Minimal", // Пока оставляем хардкод стиля для красоты
+                        style: "Minimal", 
                         count: 1 
                     })
                 });
@@ -303,7 +362,6 @@
                         <div class="grid grid-cols-2 gap-x-4 gap-y-6">
                     `;
 
-                    // Добавили проверку на undefined items
                     if (!bestOutfit.items || bestOutfit.items.length === 0) {
                         throw new Error("Нейросеть вернула пустой список вещей (items is empty)");
                     }
@@ -316,7 +374,6 @@
                         const price = item.price ? item.price : '0.00';
                         const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category || 'clothes'}`;
                         
-                        // Безопасное кодирование (защита от null)
                         const safeItem = {
                             id: item.id,
                             title: item.title || 'Без названия',
@@ -350,7 +407,6 @@
                 }
             } catch (error) {
                 console.error('Ошибка:', error);
-                // ТЕПЕРЬ ОШИБКА БУДЕТ НА ЭКРАНЕ
                 resultsContainer.innerHTML = `<div class="bg-red-50 p-4 rounded-xl border border-red-200">
                     <p class="text-red-600 text-sm font-bold mb-1">Сбой связи со стилистом:</p>
                     <p class="text-red-500 text-xs break-words">${error.message}</p>
@@ -359,8 +415,47 @@
             } finally {
                 skeleton.classList.add('hidden');
             }
-
         });
+
+        window.handleUpload = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const wardrobeTitle = document.getElementById('wardrobe-title');
+            const wardrobeDesc = document.getElementById('wardrobe-desc');
+            
+            if(wardrobeTitle) wardrobeTitle.innerText = "Идет распознавание...";
+            if(wardrobeDesc) wardrobeDesc.innerText = "Модель 5070 Ti анализирует ткань и цвет ⏳";
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/upload_clothing', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (data.status === "success") {
+                    loadMyWardrobe();
+                } else {
+                    if(wardrobeTitle) wardrobeTitle.innerText = "Ошибка 😔";
+                    if(wardrobeDesc) wardrobeDesc.innerText = data.message;
+                }
+            } catch (error) {
+                console.error("Ошибка при загрузке:", error);
+                if(wardrobeTitle) wardrobeTitle.innerText = "Ошибка сети";
+                if(wardrobeDesc) wardrobeDesc.innerText = "Не удалось связаться с сервером.";
+            } finally {
+                e.target.value = '';
+            }
+        };
+
+        if (document.getElementById('tab-wardrobe').classList.contains('active')) {
+            loadMyWardrobe();
+        }
     </script>
 </body>
 </html>
