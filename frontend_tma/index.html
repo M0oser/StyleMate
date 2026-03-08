@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>StyleMate</title>
+    <!-- Подключаем SDK Telegram Mini Apps -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <!-- Подключаем Tailwind CSS для быстрого и красивого дизайна -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Интеграция с цветами темы Telegram */
+        body {
+            background-color: var(--tg-theme-secondary-bg-color, #f3f4f6);
+            color: var(--tg-theme-text-color, #111827);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .card {
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .tg-button {
+            background-color: var(--tg-theme-button-color, #2563eb);
+            color: var(--tg-theme-button-text-color, #ffffff);
+        }
+    </style>
+</head>
+<body class="p-4 pb-20">
+
+    <!-- Шапка -->
+    <div class="text-center mb-6">
+        <h1 class="text-3xl font-bold mb-1">👔 StyleMate</h1>
+        <p class="text-sm opacity-70">Твой виртуальный стилист</p>
+    </div>
+
+    <!-- Форма выбора -->
+    <div class="card p-5 mb-6">
+        <div class="mb-4">
+            <label class="block text-sm font-semibold mb-2">Куда собираемся?</label>
+            <select id="scenario" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent text-inherit">
+                <option value="Офис">💼 В офис</option>
+                <option value="Свидание">❤️ На свидание</option>
+                <option value="Прогулка в дождь">🌧️ Прогулка в дождь</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-semibold mb-2">Предпочтения по стилю</label>
+            <select id="style" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent text-inherit">
+                <option value="Minimal">⚪ Минимализм (нейтральные цвета)</option>
+                <option value="Casual">👕 Кэжуал (допускается яркий акцент)</option>
+                <option value="Street">🛹 Стрит (свободный стиль)</option>
+            </select>
+        </div>
+
+        <button id="generateBtn" onclick="generateOutfits()" class="tg-button w-full font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95">
+            ✨ Подобрать образ
+        </button>
+    </div>
+
+    <!-- Блок с результатами -->
+    <div id="results" class="space-y-4">
+        <!-- Сюда JS будет вставлять карточки с одеждой -->
+    </div>
+
+    <script>
+        // Инициализация Telegram Web App
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Разворачиваем на весь экран
+
+        async function generateOutfits() {
+            const btn = document.getElementById('generateBtn');
+            const resultsDiv = document.getElementById('results');
+            const scenario = document.getElementById('scenario').value;
+            const style = document.getElementById('style').value;
+
+            // Анимация загрузки
+            btn.innerText = "⏳ Подбираем вещи...";
+            btn.disabled = true;
+            btn.classList.add('opacity-70');
+            resultsDiv.innerHTML = "";
+
+            try {
+                // Отправляем запрос на наш FastAPI бэкенд
+                const response = await fetch('/api/generate_outfits', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        scenario: scenario.replace(/💼 |❤️ |🌧️ /g, ''), // Убираем эмодзи перед отправкой
+                        style: style.split(' ')[0], // Берем только первое слово ("Minimal", "Casual")
+                        count: 3
+                    })
+                });
+
+                if (!response.ok) throw new Error("Ошибка сервера");
+                
+                const data = await response.json();
+                
+                if (data.outfits.length === 0) {
+                    resultsDiv.innerHTML = `<div class="card p-5 text-center text-red-500 font-bold">Не удалось собрать лук. В гардеробе не хватает подходящих вещей.</div>`;
+                    return;
+                }
+
+                // Рисуем карточки
+                data.outfits.forEach((outfit, index) => {
+                    let itemsHtml = outfit.items.map(item => `
+                        <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                            <div>
+                                <p class="font-semibold text-sm">${item.title}</p>
+                                <p class="text-xs opacity-70">Категория: ${item.category} | Цвет: ${item.color}</p>
+                            </div>
+                            <div class="font-bold text-sm bg-gray-100 px-2 py-1 rounded text-black">
+                                ${item.price ? item.price + ' ₽' : '—'}
+                            </div>
+                        </div>
+                    `).join('');
+
+                    resultsDiv.innerHTML += `
+                        <div class="card p-5">
+                            <h2 class="font-bold text-lg border-b pb-2 mb-3">🔥 Вариант #${index + 1}</h2>
+                            ${itemsHtml}
+                        </div>
+                    `;
+                });
+
+                // Если мы в ТГ, даем тактильный отклик (вибрацию)
+                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+            } catch (error) {
+                console.error(error);
+                resultsDiv.innerHTML = `<div class="card p-5 text-center text-red-500">Произошла ошибка при подключении к серверу. Убедитесь, что бэкенд запущен.</div>`;
+            } finally {
+                // Возвращаем кнопку в исходное состояние
+                btn.innerText = "✨ Подобрать образ";
+                btn.disabled = false;
+                btn.classList.remove('opacity-70');
+            }
+        }
+    </script>
+</body>
+</html>
