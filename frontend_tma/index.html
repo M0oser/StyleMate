@@ -3,140 +3,364 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>StyleMate</title>
-    <!-- Подключаем SDK Telegram Mini Apps -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Подключаем Tailwind CSS для быстрого и красивого дизайна -->
+    <title>StyleMate - AI Stylist</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: { fashion: '#111111' }
+                }
+            }
+        }
+    </script>
     <style>
-        /* Интеграция с цветами темы Telegram */
-        body {
-            background-color: var(--tg-theme-secondary-bg-color, #f3f4f6);
-            color: var(--tg-theme-text-color, #111827);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .tab-content { display: none; opacity: 0; transition: opacity 0.3s ease; }
+        .tab-content.active { display: block; opacity: 1; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-        .card {
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        .animate-fade-up { animation: fadeUp 0.4s ease forwards; }
+
+        .glass-bg {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -2;
+            background-image: url('https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1000&auto=format&fit=crop');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.4;
+            filter: grayscale(100%);
         }
-        .tg-button {
-            background-color: var(--tg-theme-button-color, #2563eb);
-            color: var(--tg-theme-button-text-color, #ffffff);
+        .glass-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -1;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
         }
     </style>
 </head>
-<body class="p-4 pb-20">
+<body class="text-fashion font-sans antialiased pb-24 selection:bg-fashion selection:text-white">
 
-    <!-- Шапка -->
-    <div class="text-center mb-6">
-        <h1 class="text-3xl font-bold mb-1">👔 StyleMate</h1>
-        <p class="text-sm opacity-70">Твой виртуальный стилист</p>
-    </div>
+    <div class="glass-bg"></div>
+    <div class="glass-overlay"></div>
 
-    <!-- Форма выбора -->
-    <div class="card p-5 mb-6">
-        <div class="mb-4">
-            <label class="block text-sm font-semibold mb-2">Куда собираемся?</label>
-            <select id="scenario" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent text-inherit">
-                <option value="Офис">💼 В офис</option>
-                <option value="Свидание">❤️ На свидание</option>
-                <option value="Прогулка в дождь">🌧️ Прогулка в дождь</option>
-            </select>
+    <header class="sticky top-0 z-40 bg-white/60 backdrop-blur-xl px-5 py-4 flex justify-between items-center border-b border-white/50">
+        <h1 class="text-xl font-bold tracking-tighter uppercase">StyleMate.</h1>
+        <div class="w-8 h-8 bg-white/80 shadow-sm rounded-full flex items-center justify-center text-sm">✨</div>
+    </header>
+
+    <main id="tab-outfit" class="tab-content active px-5 py-4">
+        <div class="mb-8">
+            <h2 class="text-3xl font-bold tracking-tight mb-2">Твой стиль</h2>
+            <p class="text-gray-600 text-sm font-medium">Выбери повод, ИИ сделает остальное.</p>
         </div>
 
-        <div class="mb-4">
-            <label class="block text-sm font-semibold mb-2">Предпочтения по стилю</label>
-            <select id="style" class="w-full p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-transparent text-inherit">
-                <option value="Minimal">⚪ Минимализм (нейтральные цвета)</option>
-                <option value="Casual">👕 Кэжуал (допускается яркий акцент)</option>
-                <option value="Street">🛹 Стрит (свободный стиль)</option>
-            </select>
+        <form id="outfit-form" class="space-y-6 mb-8">
+            <div class="flex overflow-x-auto gap-3 no-scrollbar pb-2" id="chips-container">
+                <button type="button" class="scenario-chip active-chip bg-fashion text-white px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-transform active:scale-95" data-value="Свидание">Свидание</button>
+                <button type="button" class="scenario-chip bg-white/80 shadow-sm text-gray-600 px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-transform active:scale-95" data-value="Офис">В офис</button>
+                <button type="button" class="scenario-chip bg-white/80 shadow-sm text-gray-600 px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-transform active:scale-95" data-value="Прогулка в дождь">Прогулка 🌧️</button>
+                <button type="button" class="scenario-chip bg-white/80 shadow-sm text-gray-600 px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-transform active:scale-95" data-value="custom">✍️ Свой вариант</button>
+            </div>
+
+            <input type="hidden" id="scenario" value="Свидание">
+
+            <div id="custom-input-container" class="hidden transition-all">
+                <input type="text" id="custom-scenario-text" placeholder="Например: Поход в горы с друзьями..." class="w-full bg-white/80 backdrop-blur shadow-sm border border-gray-200 text-fashion py-3.5 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-fashion">
+            </div>
+
+            <button id="submit-btn" type="submit" class="w-full bg-fashion text-white font-semibold text-sm uppercase tracking-wide py-4 rounded-2xl shadow-xl shadow-black/10 hover:bg-black active:scale-[0.98] transition-all">
+                Сгенерировать образ
+            </button>
+        </form>
+
+        <div id="skeleton-loader" class="hidden grid grid-cols-2 gap-4">
+            <div class="animate-pulse"><div class="bg-white/50 aspect-[4/5] rounded-2xl mb-3"></div></div>
+            <div class="animate-pulse delay-75"><div class="bg-white/50 aspect-[4/5] rounded-2xl mb-3"></div></div>
         </div>
 
-        <button id="generateBtn" onclick="generateOutfits()" class="tg-button w-full font-bold py-3 rounded-xl shadow-lg transition transform active:scale-95">
-            ✨ Подобрать образ
-        </button>
-    </div>
+        <div id="results-container" class="hidden">
+            <!-- Сюда вставится объяснение ИИ и сетка с вещами -->
+        </div>
+    </main>
 
-    <!-- Блок с результатами -->
-    <div id="results" class="space-y-4">
-        <!-- Сюда JS будет вставлять карточки с одеждой -->
-    </div>
+    <main id="tab-wardrobe" class="tab-content px-5 py-4">
+        <h2 class="text-3xl font-bold tracking-tight mb-2">Гардероб</h2>
+        <p class="text-gray-600 text-sm font-medium mb-8">Управляй своими цифровыми вещами.</p>
+
+        <div class="bg-white/60 backdrop-blur rounded-3xl border border-white p-10 flex flex-col items-center justify-center text-center shadow-sm">
+            <div class="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-2xl mb-4">📸</div>
+            <h3 class="font-semibold mb-1">Гардероб пуст</h3>
+            <p class="text-gray-500 text-sm mb-6">Добавь вещи, чтобы ИИ смог с ними работать.</p>
+
+            <input type="file" id="native-file-input" accept="image/*" class="hidden">
+            <button onclick="document.getElementById('native-file-input').click()" class="bg-white border border-gray-200 text-fashion font-medium text-sm px-6 py-3 rounded-full shadow-sm active:scale-95 transition-all w-full">
+                + Добавить вещь
+            </button>
+        </div>
+    </main>
+
+    <main id="tab-favorites" class="tab-content px-5 py-4">
+        <h2 class="text-3xl font-bold tracking-tight mb-2">Избранное</h2>
+        <p class="text-gray-600 text-sm font-medium mb-8">Вещи, которые ты отметил ❤️</p>
+
+        <div id="favorites-empty" class="text-center py-10">
+            <p class="text-gray-500 text-sm">Ты еще ничего не добавил в избранное.</p>
+        </div>
+        <div id="favorites-grid" class="grid grid-cols-2 gap-x-4 gap-y-6 hidden">
+            </div>
+    </main>
+
+    <nav class="fixed bottom-0 w-full bg-white/80 backdrop-blur-xl border-t border-gray-100 pb-safe z-50">
+        <div class="flex justify-around items-center h-20 px-4">
+            <button onclick="switchTab('wardrobe')" id="btn-wardrobe" class="nav-btn flex flex-col items-center text-gray-400 transition-all">
+                <svg class="w-6 h-6 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                <span class="text-[10px] font-semibold uppercase tracking-widest">Гардероб</span>
+            </button>
+            <button onclick="switchTab('outfit')" id="btn-outfit" class="nav-btn flex flex-col items-center text-fashion scale-110 transition-all">
+                <svg class="w-6 h-6 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                <span class="text-[10px] font-semibold uppercase tracking-widest">Образ</span>
+            </button>
+            <button onclick="switchTab('favorites')" id="btn-favorites" class="nav-btn flex flex-col items-center text-gray-400 transition-all">
+                <svg class="w-6 h-6 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                <span class="text-[10px] font-semibold uppercase tracking-widest">Лайки</span>
+            </button>
+        </div>
+    </nav>
 
     <script>
-        // Инициализация Telegram Web App
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Разворачиваем на весь экран
+        tg.expand();
+        tg.ready();
 
-        async function generateOutfits() {
-            const btn = document.getElementById('generateBtn');
-            const resultsDiv = document.getElementById('results');
-            const scenario = document.getElementById('scenario').value;
-            const style = document.getElementById('style').value;
+        let lastGeneratedScenario = null;
+        let favorites = [];
 
-            // Анимация загрузки
-            btn.innerText = "⏳ Подбираем вещи...";
-            btn.disabled = true;
-            btn.classList.add('opacity-70');
-            resultsDiv.innerHTML = "";
+        const chips = document.querySelectorAll('.scenario-chip');
+        const hiddenInput = document.getElementById('scenario');
+        const customInputContainer = document.getElementById('custom-input-container');
+        const customInputText = document.getElementById('custom-scenario-text');
+        const submitBtn = document.getElementById('submit-btn');
 
-            try {
-                // Отправляем запрос на наш FastAPI бэкенд
+        chips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                chips.forEach(c => {
+                    c.classList.remove('bg-fashion', 'text-white', 'active-chip');
+                    c.classList.add('bg-white/80', 'text-gray-600');
+                });
+                chip.classList.remove('bg-white/80', 'text-gray-600');
+                chip.classList.add('bg-fashion', 'text-white', 'active-chip');
+
+                const val = chip.dataset.value;
+
+                if (val === 'custom') {
+                    customInputContainer.classList.remove('hidden');
+                    hiddenInput.value = customInputText.value;
+                } else {
+                    customInputContainer.classList.add('hidden');
+                    hiddenInput.value = val;
+                }
+                updateButtonText();
+            });
+        });
+
+        customInputText.addEventListener('input', (e) => {
+            if (document.querySelector('.active-chip').dataset.value === 'custom') {
+                hiddenInput.value = e.target.value;
+                updateButtonText();
+            }
+        });
+
+        function updateButtonText() {
+            if (hiddenInput.value && hiddenInput.value === lastGeneratedScenario) {
+                submitBtn.innerText = "Подобрать новый образ";
+            } else {
+                submitBtn.innerText = "Сгенерировать образ";
+            }
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(el => {
+                el.classList.remove('text-fashion', 'scale-110');
+                el.classList.add('text-gray-400');
+            });
+
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            const activeBtn = document.getElementById(`btn-${tabName}`);
+            activeBtn.classList.remove('text-gray-400');
+            activeBtn.classList.add('text-fashion', 'scale-110');
+
+            if(tabName === 'favorites') renderFavorites();
+        }
+
+        window.toggleFavorite = function(btn, itemStr) {
+            const item = JSON.parse(decodeURIComponent(itemStr));
+            const svg = btn.querySelector('svg');
+
+            const index = favorites.findIndex(f => f.id === item.id);
+            if (index === -1) {
+                favorites.push(item);
+                svg.classList.add('text-red-500', 'fill-current');
+            } else {
+                favorites.splice(index, 1);
+                svg.classList.remove('text-red-500', 'fill-current');
+            }
+            if (document.getElementById('tab-favorites').classList.contains('active')) {
+                renderFavorites();
+            }
+        };
+
+        function renderFavorites() {
+            const emptyEl = document.getElementById('favorites-empty');
+            const gridEl = document.getElementById('favorites-grid');
+
+            if (favorites.length === 0) {
+                emptyEl.classList.remove('hidden');
+                gridEl.classList.add('hidden');
+                gridEl.innerHTML = '';
+            } else {
+                emptyEl.classList.add('hidden');
+                gridEl.classList.remove('hidden');
+                gridEl.innerHTML = '';
+
+                favorites.forEach((item, index) => {
+                    const price = item.price ? item.price : '0.00';
+                    const card = document.createElement('div');
+                    card.className = "group cursor-pointer animate-fade-up";
+                    card.style.animationDelay = `${index * 0.05}s`;
+
+                    const itemDataStr = encodeURIComponent(JSON.stringify(item));
+                    const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category}`;
+
+                    card.innerHTML = `
+                        <div class="relative aspect-[4/5] bg-white rounded-2xl overflow-hidden mb-3 shadow-sm border border-gray-100">
+                            <img src="${imgUrl}" class="w-full h-full object-cover">
+                            <button onclick="toggleFavorite(this, '${itemDataStr}')" class="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-red-500 fill-current shadow-sm transition-transform active:scale-75">
+                                <svg class="w-4 h-4 text-red-500 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
+                            </button>
+                        </div>
+                        <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${item.title}</p>
+                        <p class="text-sm font-bold text-fashion">$${price}</p>
+                    `;
+                    gridEl.appendChild(card);
+                });
+            }
+        }
+
+        document.getElementById('outfit-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const currentScenario = hiddenInput.value;
+            if (!currentScenario) return;
+
+            const skeleton = document.getElementById('skeleton-loader');
+            const resultsContainer = document.getElementById('results-container');
+
+            skeleton.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            resultsContainer.innerHTML = '';
+
+                        try {
+                // ИСПРАВЛЕНИЕ: Передаем правильные параметры в бэкенд
                 const response = await fetch('/api/generate_outfits', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        scenario: scenario.replace(/💼 |❤️ |🌧️ /g, ''), // Убираем эмодзи перед отправкой
-                        style: style.split(' ')[0], // Берем только первое слово ("Minimal", "Casual")
-                        count: 3
+                    body: JSON.stringify({ 
+                        scenario: currentScenario,
+                        style: "Minimal", // Пока оставляем хардкод стиля для красоты
+                        count: 1 
                     })
                 });
 
-                if (!response.ok) throw new Error("Ошибка сервера");
-                
+                if (!response.ok) throw new Error('HTTP error ' + response.status);
                 const data = await response.json();
-                
-                if (data.outfits.length === 0) {
-                    resultsDiv.innerHTML = `<div class="card p-5 text-center text-red-500 font-bold">Не удалось собрать лук. В гардеробе не хватает подходящих вещей.</div>`;
-                    return;
-                }
 
-                // Рисуем карточки
-                data.outfits.forEach((outfit, index) => {
-                    let itemsHtml = outfit.items.map(item => `
-                        <div class="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                            <div>
-                                <p class="font-semibold text-sm">${item.title}</p>
-                                <p class="text-xs opacity-70">Категория: ${item.category} | Цвет: ${item.color}</p>
-                            </div>
-                            <div class="font-bold text-sm bg-gray-100 px-2 py-1 rounded text-black">
-                                ${item.price ? item.price + ' ₽' : '—'}
+                if (data.outfits && data.outfits.length > 0) {
+                    const bestOutfit = data.outfits[0];
+                    const aiExplanation = bestOutfit.explanation ? bestOutfit.explanation : "Идеальное сочетание для вашего запроса.";
+                    
+                    let htmlContent = `
+                        <div class="mb-4">
+                            <h3 class="text-lg font-semibold tracking-tight mb-2">Выбор стилиста</h3>
+                            <div class="bg-white/80 backdrop-blur p-4 rounded-xl border border-gray-100 shadow-sm">
+                                <p class="text-sm text-gray-700 italic leading-relaxed">«${aiExplanation}»</p>
                             </div>
                         </div>
-                    `).join('');
-
-                    resultsDiv.innerHTML += `
-                        <div class="card p-5">
-                            <h2 class="font-bold text-lg border-b pb-2 mb-3">🔥 Вариант #${index + 1}</h2>
-                            ${itemsHtml}
-                        </div>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-6">
                     `;
-                });
 
-                // Если мы в ТГ, даем тактильный отклик (вибрацию)
-                if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+                    // Добавили проверку на undefined items
+                    if (!bestOutfit.items || bestOutfit.items.length === 0) {
+                        throw new Error("Нейросеть вернула пустой список вещей (items is empty)");
+                    }
 
+                    bestOutfit.items.forEach((item, index) => {
+                        if (!item.id) item.id = 'item_' + Math.random().toString(36).substr(2, 9);
+
+                        const isFav = favorites.some(f => f.id === item.id);
+                        const heartClass = isFav ? "text-red-500 fill-current" : "text-gray-400";
+                        const price = item.price ? item.price : '0.00';
+                        const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category || 'clothes'}`;
+                        
+                        // Безопасное кодирование (защита от null)
+                        const safeItem = {
+                            id: item.id,
+                            title: item.title || 'Без названия',
+                            category: item.category || 'unknown',
+                            price: price,
+                            image_url: imgUrl
+                        };
+                        const itemDataStr = encodeURIComponent(JSON.stringify(safeItem));
+
+                        htmlContent += `
+                            <div class="group cursor-pointer animate-fade-up" style="animation-delay: ${index * 0.1}s">
+                                <div class="relative aspect-[4/5] bg-white rounded-2xl overflow-hidden mb-3 shadow-sm border border-gray-100">
+                                    <img src="${imgUrl}" alt="${safeItem.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/400x500/eeeeee/999999?text=Error'">
+                                    <button onclick="toggleFavorite(this, '${itemDataStr}')" class="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-sm transition-transform active:scale-75 ${heartClass}">
+                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
+                                    </button>
+                                </div>
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">${safeItem.category}</h4>
+                                <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${safeItem.title}</p>
+                                <p class="text-sm font-bold text-fashion">$${safeItem.price}</p>
+                            </div>
+                        `;
+                    });
+
+                    htmlContent += `</div>`;
+                    resultsContainer.innerHTML = htmlContent;
+
+                    lastGeneratedScenario = currentScenario;
+                    updateButtonText();
+                    resultsContainer.classList.remove('hidden');
+                }
             } catch (error) {
-                console.error(error);
-                resultsDiv.innerHTML = `<div class="card p-5 text-center text-red-500">Произошла ошибка при подключении к серверу. Убедитесь, что бэкенд запущен.</div>`;
+                console.error('Ошибка:', error);
+                // ТЕПЕРЬ ОШИБКА БУДЕТ НА ЭКРАНЕ
+                resultsContainer.innerHTML = `<div class="bg-red-50 p-4 rounded-xl border border-red-200">
+                    <p class="text-red-600 text-sm font-bold mb-1">Сбой связи со стилистом:</p>
+                    <p class="text-red-500 text-xs break-words">${error.message}</p>
+                </div>`;
+                resultsContainer.classList.remove('hidden');
             } finally {
-                // Возвращаем кнопку в исходное состояние
-                btn.innerText = "✨ Подобрать образ";
-                btn.disabled = false;
-                btn.classList.remove('opacity-70');
+                skeleton.classList.add('hidden');
             }
-        }
+
+        });
     </script>
 </body>
 </html>

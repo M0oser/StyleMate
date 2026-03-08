@@ -9,6 +9,7 @@ from typing import List
 # Импортируем функции из наших сервисов
 from backend.services.db_crud import search_products
 from backend.services.outfit_generator import load_wardrobe_from_db, generate_outfits, SCENARIOS, STYLES
+from backend.services.rag_agent import generate_outfit_via_llm
 
 app = FastAPI(title="StyleMate API")
 
@@ -62,27 +63,37 @@ async def upload_clothing():
 
 @app.post("/api/generate_outfits")
 async def api_generate_outfits(req: OutfitRequest):
-    if req.scenario not in SCENARIOS or req.style not in STYLES:
-        raise HTTPException(status_code=400, detail="Invalid scenario or style. Проверьте правильность написания.")
-
-    # Берем гардероб из БД
+    # 1. Берем гардероб из БД
     wardrobe = load_wardrobe_from_db(db_path="products.db")
     if not wardrobe:
         raise HTTPException(status_code=404, detail="Wardrobe is empty")
 
-    # Убираем аксессуары, чтобы они не ломали базовую логику Зи
-    wardrobe_view = [x for x in wardrobe if x.cat != "accessory"]
+    # Убираем аксессуары, берем только основные вещи (ограничиваем до 100)
+    wardrobe_view = [{"id": x.id, "title": x.title, "category": x.cat, "color": x.color, "price": x.price, "image_url": x.image_url} for x in wardrobe if x.cat != "accessory"][:100]
 
-    # Генерируем луки
-    outfits = generate_outfits(wardrobe_view, req.scenario, req.style, k=req.count)
+    # 2. ПРОСИМ НЕЙРОСЕТЬ СОБРАТЬ ЛУК (RAG)
+    print(f"Отправляю запрос в Qwen... Сценарий: {req.scenario}")
+    llm_response = generate_outfit_via_llm(wardrobe_view, req.scenario, req.style)
+    
+    # 3. Достаем вещи по ID, которые вернула нейросеть
+    selected_ids = llm_response.get("item_ids", [])
+    outfit_items = [item for item in wardrobe_view if item["id"] in selected_ids]
+    
+    # Если нейросеть ничего не вернула (сбой), отдаем хотя бы одну заглушку, чтобы фронт не падал
+    if not outfit_items:
+        print("Внимание: Нейросеть не смогла собрать лук, отдаем fallback")
+        # Берем первые 3 вещи из базы просто как резервный вариант
+        outfit_items = wardrobe_view[:3]
+        explanation = "Нейросеть устала, вот случайные вещи из твоего гардероба."
+    else:
+        explanation = llm_response.get("explanation", "Мой выбор для тебя")
 
-    # Преобразуем ответ для фронтенда
-    result = []
-    for score, outfit_items in outfits:
-        items_dict = [{"id": i.id, "title": i.title, "category": i.cat, "color": i.color, "price": i.price} for i in outfit_items]
-        result.append({
-            "score": score,
-            "items": items_dict
-        })
+    # 4. Формируем ответ для фронтенда
+    result = [{
+        "score": 100, 
+        "explanation": explanation, # Добавили поле с текстом нейросети
+        "items": outfit_items       # Фронтенд Ильяса ждет массив словарей именно здесь
+    }]
 
     return {"scenario": req.scenario, "style": req.style, "outfits": result}
+
