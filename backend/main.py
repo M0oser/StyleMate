@@ -8,6 +8,8 @@ import httpx
 import sqlite3
 import os
 import uuid
+from dotenv import load_dotenv
+load_dotenv()
 
 # Импортируем функции из наших сервисов
 from backend.services.outfit_generator import load_wardrobe_from_db, insert_user_wardrobe_item
@@ -97,7 +99,7 @@ import uuid # Добавь в импорты наверху, если нет
 
 @app.post("/api/upload_clothing")
 async def upload_clothing(file: UploadFile = File(...)):
-    ARTEM_MICROSERVICE_URL = "https://ayomg-185-122-185-121.a.free.pinggy.link/analyze_image"
+    ARTEM_MICROSERVICE_URL = "http://rysgm-185-122-185-121.a.free.pinggy.link/"
     
     try:
         # 1. Читаем файл

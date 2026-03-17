@@ -1,95 +1,126 @@
+import os
 import json
-import subprocess
+import random
 from typing import List, Dict
+from gigachat import GigaChat
+
+def get_gigachat_key():
+    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    env_path = os.path.join(base_dir, '.env')
+    try:
+        with open(env_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.startswith('GIGACHAT_CREDENTIALS='):
+                    return line.split('=', 1)[1].strip()
+    except Exception:
+        pass
+    # Если .env не сработал, просто вставь свой ключ сюда (в кавычках)
+    return "MDE5Y2Q5MTktMDE1Zi03MTljLTlhMDEtMTYyZmU4NTdlZDJmOmY3NzMwNjhlLTU5YzctNDhmMi1hZTA5LTQ0MWJkOWVmZWI4NQ=="
 
 def generate_outfit_via_llm(wardrobe: List[Dict], scenario: str, style: str) -> dict:
-    """
-    Генерирует лук, вызывая Ollama напрямую через терминальную команду.
-    Использует жесткую структуру JSON для гарантии наличия всех элементов одежды.
-    """
-    wardrobe_text = ""
-    for item in wardrobe:
-        wardrobe_text += f"- ID: {item['id']}, Вещь: {item['title']}, Категория: {item['category']}, Цвет: {item['color']}\n"
+    GIGACHAT_CREDENTIALS = get_gigachat_key()
 
+    if not GIGACHAT_CREDENTIALS:
+        return {"explanation": "Ошибка: нет ключа GigaChat", "items": []}
+
+    # 1. РАЗБИВАЕМ ВЕЩИ ПО КАТЕГОРИЯМ
+    tops = [w for w in wardrobe if w['category'] in ['tshirt', 'shirt', 'sweater', 'hoodie']]
+    bottoms = [w for w in wardrobe if w['category'] in ['jeans', 'trousers', 'shorts', 'skirt']]
+    shoes = [w for w in wardrobe if w['category'] in ['sneakers', 'boots', 'shoes', 'loafers']]
+    outerwear = [w for w in wardrobe if w['category'] in ['jacket', 'coat', 'blazer']]
+
+    if not tops or not bottoms or not shoes:
+        return {"explanation": "В гардеробе не хватает базовых вещей для сборки лука.", "items": []}
+
+    # 2. ПИТОН СОБИРАЕТ 5 СЛУЧАЙНЫХ ЛУКОВ (Идеально правильных)
+    candidate_outfits = []
+    for i in range(1, 6):
+        t = random.choice(tops)
+        b = random.choice(bottoms)
+        s = random.choice(shoes)
+        
+        outfit_desc = f"Лук #{i}:\n- Верх: {t['title']} (Цвет: {t['color']})\n- Низ: {b['title']} (Цвет: {b['color']})\n- Обувь: {s['title']} (Цвет: {s['color']})"
+        item_ids = [t['id'], b['id'], s['id']]
+        
+        # Добавляем куртку иногда
+        if outerwear and (random.random() < 0.4 or "дождь" in scenario.lower() or "офис" in scenario.lower()):
+            o = random.choice(outerwear)
+            outfit_desc += f"\n- Верхняя одежда: {o['title']} (Цвет: {o['color']})"
+            item_ids.append(o['id'])
+            
+        candidate_outfits.append({
+            "id": i,
+            "desc": outfit_desc,
+            "item_ids": item_ids
+        })
+
+    candidates_text = "\n\n".join([c["desc"] for c in candidate_outfits])
+
+    # 3. НЕЙРОСЕТЬ ТОЛЬКО ВЫБИРАЕТ НОМЕР ЛУКА И ОБЪЯСНЯЕТ
     system_prompt = f"""
-    Ты - профессиональный стилист (Fashion AI). 
-    Собери стильный образ для пользователя из его гардероба.
-    Мероприятие: {scenario}.
-    Предпочитаемый стиль: {style}.
+    Ты - профессиональный Fashion-стилист.
+    Твоя задача - выбрать ОДИН лучший образ из 5 предложенных.
     
-    Доступный гардероб:
-    {wardrobe_text}
+    СЦЕНАРИЙ (Куда идет клиент): {scenario}
+    ОСОБЫЕ ПОЖЕЛАНИЯ КЛИЕНТА: {style}
     
-    ПРАВИЛА (ОЧЕНЬ ВАЖНО - СТРОГО СОБЛЮДАЙ СЛОТЫ):
-    1. Слот "top_id" (Верх): ОБЯЗАТЕЛЬНО выбери ровно одну базовую вещь (tshirt, shirt, hoodie, sweater).
-    2. Слот "bottom_id" (Низ): ОБЯЗАТЕЛЬНО выбери ровно одну вещь (jeans, trousers, shorts).
-    3. Слот "shoes_id" (Обувь): ОБЯЗАТЕЛЬНО выбери ровно одну пару (sneakers, boots, shoes).
-    4. Слот "outerwear_id" (Верхняя одежда): Если сценарий предполагает выход на улицу в плохую погоду ("дождь") или строгий стиль ("офис"), выбери поверх "top_id" еще одну вещь (jacket, coat, blazer). Если верхняя одежда не нужна, напиши null.
-    5. Вещи должны сочетаться по цвету и стилю.
-    6. Верни результат СТРОГО в формате JSON без маркдауна.
-
+    Вот 5 готовых образов на выбор:
+    {candidates_text}
+    
+    ПРАВИЛА:
+    1. Изучи пожелания клиента. Если он просит "бежевые штаны" или "спортзал", найди тот Лук, в котором вещи максимально подходят под этот запрос.
+    2. Выбери только ОДИН лучший Лук (укажи его номер от 1 до 5).
+    3. В поле explanation подробно распиши, ПОЧЕМУ этот лук подходит клиенту. ОБЯЗАТЕЛЬНО называй вещи теми же цветами, которые указаны в описании Лука! Не выдумывай яркие цвета, если ты выбрал черные вещи.
+    4. Верни строго JSON.
     
     Формат ответа:
     {{
-        "explanation": "краткое объяснение, почему ты выбрал эти вещи",
-        "top_id": 1,
-        "bottom_id": 2,
-        "shoes_id": 3,
-        "outerwear_id": 4
+        "best_outfit_id": 3,
+        "explanation": "Я выбрал Лук #3, потому что серые брюки отлично сочетаются с..."
     }}
-    Если верхней одежды нет, передай null вместо ID.
     """
 
     try:
-        # Вызываем Ollama как если бы ты писал в терминале
-        # Команда: ollama run qwen2.5:latest "system prompt"
-        result = subprocess.run(
-            ["ollama", "run", "qwen2.5:latest", system_prompt],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        
-        content = result.stdout.strip()
-        
-        # Чистим ответ, чтобы оставить только JSON
-        if "{" in content and "}" in content:
-            start = content.find("{")
-            end = content.rfind("}") + 1
-            json_str = content[start:end]
-            parsed_json = json.loads(json_str)
+        with GigaChat(credentials=GIGACHAT_CREDENTIALS, verify_ssl_certs=False) as giga:
+            response = giga.chat({
+                "model": "GigaChat-Pro",
+                "messages": [
+                    {"role": "system", "content": "Ты ИИ-стилист. Отвечай только валидным JSON."},
+                    {"role": "user", "content": system_prompt}
+                ],
+                "temperature": 0.3
+            })
             
-            # Собираем ID из новой структуры в один список для нашего бэкенда
-            item_ids = []
-            for key in ["top_id", "bottom_id", "shoes_id", "outerwear_id"]:
-                if key in parsed_json and parsed_json[key] is not None:
-                    # Убеждаемся, что ID это число
-                    try:
-                        item_ids.append(int(parsed_json[key]))
-                    except (ValueError, TypeError):
-                        pass
-                    
+            content = response.choices[0].message.content
+            
+            start = content.find('{')
+            end = content.rfind('}') + 1
+            if start != -1 and end != 0:
+                content = content[start:end]
+            else:
+                raise ValueError("Не найден JSON в ответе")
+                
+            parsed_json = json.loads(content)
+            
+            chosen_id = parsed_json.get("best_outfit_id", 1)
+            if not isinstance(chosen_id, int) or chosen_id < 1 or chosen_id > 5:
+                chosen_id = 1
+                
+            final_item_ids = candidate_outfits[chosen_id - 1]["item_ids"]
+            
+            # ВОТ ОН: ГАРАНТИРОВАННЫЙ ВОЗВРАТ ПОЛНЫХ ОБЪЕКТОВ, ЧТОБЫ ТЕКСТ СОВПАДАЛ С КАРТИНКАМИ
+            final_items = [w for w in wardrobe if w['id'] in final_item_ids]
+            
             return {
-                "explanation": parsed_json.get("explanation", "Мой выбор для тебя"),
-                "item_ids": item_ids
+                "explanation": parsed_json.get("explanation", "Вот отличный образ для тебя!"),
+                "items": final_items # Возвращаем список объектов
             }
-        else:
-            raise ValueError("Модель не вернула JSON")
             
     except Exception as e:
-        print(f"Ошибка RAG Агента (subprocess): {e}")
-        return {"explanation": "Не удалось собрать лук", "item_ids": []}
-
-if __name__ == "__main__":
-    # Тестовый запуск
-    mock_wardrobe = [
-        {"id": 1, "title": "White T-Shirt", "category": "tshirt", "color": "white"},
-        {"id": 2, "title": "Blue Jeans", "category": "jeans", "color": "blue"},
-        {"id": 3, "title": "Black Blazer", "category": "jacket", "color": "black"},
-        {"id": 4, "title": "Red Sneakers", "category": "sneakers", "color": "red"},
-        {"id": 5, "title": "Brown Loafers", "category": "shoes", "color": "brown"}
-    ]
-    
-    print("Отправляю запрос в Qwen через терминал (subprocess)...")
-    result = generate_outfit_via_llm(mock_wardrobe, scenario="Офис", style="Minimal")
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+        print(f"Ошибка GigaChat API: {e}")
+        fallback_ids = candidate_outfits[0]["item_ids"] if candidate_outfits else []
+        fallback_items = [w for w in wardrobe if w['id'] in fallback_ids]
+        return {
+            "explanation": "Стилист задумался, но вот отличный случайный образ для тебя!", 
+            "items": fallback_items
+        }
