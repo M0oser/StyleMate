@@ -1,0 +1,15 @@
+.DS_Store
+.idea/
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local runtime/cache artifacts
+desktop_app/.image_cache/
+
+# OS / editor noise
+*.swp
+*.swo
