@@ -1,19 +1,30 @@
-from fastapi import FastAPI, HTTPException, File, UploadFile
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List
-import httpx
-import sqlite3
 import os
 import uuid
-from dotenv import load_dotenv
-load_dotenv()
+import sqlite3
+from typing import Optional
 
-# Импортируем функции из наших сервисов
-from backend.services.outfit_generator import load_wardrobe_from_db, insert_user_wardrobe_item
+import httpx
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, File, UploadFile, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from backend.services.outfit_generator import (
+    clear_user_wardrobe,
+    delete_user_wardrobe_items,
+    ensure_user_wardrobe_schema,
+    normalize_owner_token,
+    load_wardrobe_from_db,
+    insert_user_wardrobe_item,
+    update_user_wardrobe_item,
+)
 from backend.services.rag_agent import generate_outfit_via_llm
+from backend.services.vision_service import analyze_uploaded_clothing
+
+load_dotenv(override=True)
+ensure_user_wardrobe_schema()
 
 app = FastAPI(title="StyleMate API")
 
@@ -25,61 +36,142 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class OutfitRequest(BaseModel):
     scenario: str
     style: str
+    gender: str = "male"
     count: int = 1
+    source_mode: str = "mixed"
+
+
+class WardrobeItemUpdateRequest(BaseModel):
+    title: str
+    category: str
+    color: str
+    style: str = "unknown"
+
+
+class WardrobeDeleteRequest(BaseModel):
+    item_ids: list[int]
+
+
+def _get_owner_token(request: Request, required: bool = True) -> Optional[str]:
+    owner_token = normalize_owner_token(request.headers.get("X-Owner-Token"))
+
+    if required and not owner_token:
+        raise HTTPException(status_code=400, detail="Missing X-Owner-Token header")
+
+    return owner_token
+
 
 app.mount("/static", StaticFiles(directory="frontend_tma"), name="static")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def root():
     with open("frontend_tma/index.html", "r", encoding="utf-8") as f:
-        return f.read()
+        return HTMLResponse(
+            content=f.read(),
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "message": "StyleMate Backend is running!"}
 
+
 @app.post("/api/generate_outfits")
-async def api_generate_outfits(req: OutfitRequest):
-    wardrobe = load_wardrobe_from_db(db_path="database/wardrobe.db")
+async def api_generate_outfits(req: OutfitRequest, request: Request):
+    owner_token = _get_owner_token(request, required=req.source_mode in {"user", "mixed"})
+
+    wardrobe = load_wardrobe_from_db(
+        db_path="database/wardrobe.db",
+        source_mode=req.source_mode,
+        limit=2000,
+        owner_token=owner_token,
+    )
+
     if not wardrobe:
         raise HTTPException(status_code=404, detail="Wardrobe is empty")
 
-    wardrobe_view = [{"id": x.id, "title": x.title, "category": x.cat, "color": x.color, "price": x.price, "image_url": x.image_url} for x in wardrobe if x.cat != "accessory"][:100]
+    wardrobe_view = [
+        {
+            "id": x.id,
+            "title": x.title,
+            "category": x.cat,
+            "color": x.color,
+            "price": x.price,
+            "image_url": x.image_url,
+            "url": x.url,
+            "source": x.source,
+        }
+        for x in wardrobe
+        if x.cat != "accessory"
+    ]
 
-    print(f"Отправляю запрос в Qwen... Сценарий: {req.scenario}")
-    llm_response = generate_outfit_via_llm(wardrobe_view, req.scenario, req.style)
-    
-    selected_ids = llm_response.get("item_ids", [])
-    outfit_items = [item for item in wardrobe_view if item["id"] in selected_ids]
-    
+    print(
+        f"[API] generate_outfits scenario={req.scenario} "
+        f"style={req.style} gender={req.gender} source_mode={req.source_mode}"
+    )
+    print("[API] wardrobe_view categories:", [item["category"] for item in wardrobe_view])
+
+    llm_response = generate_outfit_via_llm(wardrobe_view, req.scenario, req.style, req.gender)
+
+    outfit_items = llm_response.get("items", [])
+    explanation = llm_response.get("explanation", "Мой выбор для тебя")
+
     if not outfit_items:
-        print("Внимание: Нейросеть не смогла собрать лук, отдаем fallback")
-        outfit_items = wardrobe_view[:3]
-        explanation = "Нейросеть устала, вот случайные вещи из твоего гардероба."
-    else:
-        explanation = llm_response.get("explanation", "Мой выбор для тебя")
+        print("[API] Подходящий лук не найден. Возвращаем пустой результат без случайного fallback.")
+        return {
+            "scenario": req.scenario,
+            "style": req.style,
+            "gender": req.gender,
+            "source_mode": req.source_mode,
+            "outfits": [{
+                "score": 0,
+                "explanation": explanation,
+                "items": []
+            }]
+        }
 
     result = [{
-        "score": 100, 
+        "score": 100,
         "explanation": explanation,
         "items": outfit_items
     }]
 
-    return {"scenario": req.scenario, "style": req.style, "outfits": result}
+    return {
+        "scenario": req.scenario,
+        "style": req.style,
+        "gender": req.gender,
+        "source_mode": req.source_mode,
+        "outfits": result
+    }
+
+
 @app.get("/api/my_wardrobe")
-async def get_my_wardrobe():
-    """Возвращает вещи, которые пользователь загрузил сам."""
+async def get_my_wardrobe(request: Request):
+    owner_token = _get_owner_token(request)
+
     try:
+        ensure_user_wardrobe_schema()
         con = sqlite3.connect("database/wardrobe.db")
         cur = con.cursor()
-        # Берем данные из личной таблицы пользователя
-        cur.execute("SELECT id, title, category, color, image_url FROM user_wardrobe ORDER BY id DESC")
+        cur.execute("""
+            SELECT id, title, category, color, image_url, style, vision_source, manually_edited
+            FROM user_wardrobe
+            WHERE owner_token = ?
+            ORDER BY id DESC
+        """, (owner_token,))
         rows = cur.fetchall()
         con.close()
-        
+
         items = []
         for r in rows:
             items.append({
@@ -87,69 +179,194 @@ async def get_my_wardrobe():
                 "title": r[1],
                 "category": r[2],
                 "color": r[3],
-                "image_url": r[4]
+                "image_url": r[4],
+                "style": r[5],
+                "vision_source": r[6],
+                "manually_edited": bool(r[7]),
             })
         return items
     except Exception as e:
-        print(f"Ошибка при получении гардероба: {e}")
+        print(f"[WARDROBE] Ошибка при получении гардероба: {e}")
         return []
-    
-import os
-import uuid # Добавь в импорты наверху, если нет
+
+
+@app.put("/api/my_wardrobe/{item_id}")
+async def update_my_wardrobe_item(item_id: int, req: WardrobeItemUpdateRequest, request: Request):
+    owner_token = _get_owner_token(request)
+    updated = update_user_wardrobe_item(
+        item_id=item_id,
+        title=req.title,
+        category=req.category,
+        color=req.color,
+        style=req.style,
+        owner_token=owner_token,
+        db_path="database/wardrobe.db",
+    )
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="Wardrobe item not found")
+
+    return {"status": "success"}
+
+
+@app.delete("/api/my_wardrobe/{item_id}")
+async def delete_my_wardrobe_item(item_id: int, request: Request):
+    owner_token = _get_owner_token(request)
+    deleted_count = delete_user_wardrobe_items([item_id], owner_token=owner_token, db_path="database/wardrobe.db")
+
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Wardrobe item not found")
+
+    return {"status": "success", "deleted_count": deleted_count}
+
+
+@app.post("/api/my_wardrobe/bulk_delete")
+async def bulk_delete_my_wardrobe_items(req: WardrobeDeleteRequest, request: Request):
+    owner_token = _get_owner_token(request)
+    deleted_count = delete_user_wardrobe_items(req.item_ids, owner_token=owner_token, db_path="database/wardrobe.db")
+    return {"status": "success", "deleted_count": deleted_count}
+
+
+@app.delete("/api/my_wardrobe")
+async def delete_all_my_wardrobe_items(request: Request):
+    owner_token = _get_owner_token(request)
+    deleted_count = clear_user_wardrobe(db_path="database/wardrobe.db", owner_token=owner_token)
+    return {"status": "success", "deleted_count": deleted_count}
+
+
+def _safe_insert_unknown_item(
+    image_url: str,
+    owner_token: str,
+    vision_payload_path: Optional[str] = None,
+) -> None:
+    try:
+        insert_user_wardrobe_item(
+            title="Новая вещь",
+            category="unknown",
+            color="unknown",
+            style="unknown",
+            image_url=image_url,
+            vision_source="fallback",
+            vision_payload={"category": "unknown", "color": "unknown", "style": "unknown"},
+            vision_payload_path=vision_payload_path,
+            owner_token=owner_token,
+        )
+    except Exception as e:
+        print(f"[UPLOAD] Не удалось сохранить unknown item: {e}")
+
 
 @app.post("/api/upload_clothing")
-async def upload_clothing(file: UploadFile = File(...)):
-    ARTEM_MICROSERVICE_URL = "http://rysgm-185-122-185-121.a.free.pinggy.link/"
-    
+async def upload_clothing(request: Request, file: UploadFile = File(...)):
+    owner_token = _get_owner_token(request)
+    public_image_url = None
+    vision_json_path = None
+
     try:
-        # 1. Читаем файл
         image_bytes = await file.read()
-        
-        # 2. Сохраняем файл локально, чтобы его можно было показать во фронтенде!
-        # Генерируем уникальное имя, чтобы файлы не перезаписывали друг друга
-        file_ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+
+        if not image_bytes:
+            return {"status": "error", "message": "Файл пустой"}
+
+        file_ext = file.filename.split(".")[-1].lower() if file.filename and "." in file.filename else "jpg"
         unique_filename = f"{uuid.uuid4().hex}.{file_ext}"
+        os.makedirs(os.path.join("frontend_tma", "uploads"), exist_ok=True)
         save_path = os.path.join("frontend_tma", "uploads", unique_filename)
-        
+
         with open(save_path, "wb") as f:
             f.write(image_bytes)
-            
-        # Формируем публичную ссылку, по которой фронтенд сможет открыть эту картинку
+
         public_image_url = f"/static/uploads/{unique_filename}"
-        
-        # 3. Отправляем картинку Артему для анализа
-        print(f"Отправляю картинку '{unique_filename}' на 5070 Ti Артему...")
-        async with httpx.AsyncClient() as client:
-            files = {'file': (file.filename, image_bytes, file.content_type)}
-            response = await client.post(
-                ARTEM_MICROSERVICE_URL, 
-                files=files, 
-                timeout=60.0,
-                follow_redirects=True
-            )
-            
-            if response.status_code != 200:
-                print(f"Сервер Артема вернул ошибку: {response.text}")
-                # Даже если Артем недоступен, мы всё равно сохраняем вещь с картинкой!
-                insert_user_wardrobe_item(title="Новая вещь", category="unknown", color="unknown", image_url=public_image_url)
-                return {"status": "success", "message": "Сохранено без ИИ"}
-                
-            ai_data = response.json()
-            
-            # 4. Сохраняем в БД ВМЕСТЕ С КАРТИНКОЙ
-            cat = ai_data.get('category', 'clothes')
-            col = ai_data.get('color', 'unknown')
-            new_title = f"{str(col).capitalize()} {str(cat).capitalize()}"
-            
-            insert_user_wardrobe_item(title=new_title, category=cat, color=col, image_url=public_image_url)
-            print("Вещь с картинкой успешно сохранена в базу!")
-            
-            return {
-                "status": "success",
-                "message": "Успешно распознано и добавлено!",
-                "ai_analysis": ai_data
+        meta_dir = os.path.join("frontend_tma", "uploads", "meta")
+        os.makedirs(meta_dir, exist_ok=True)
+        vision_json_path = os.path.join(meta_dir, f"{os.path.splitext(unique_filename)[0]}.json")
+
+        print(f"[UPLOAD] Анализирую '{unique_filename}' локально/через fallback vision")
+
+        ai_data, vision_source = await analyze_uploaded_clothing(
+            image_path=save_path,
+            image_bytes=image_bytes,
+            filename=file.filename or f"upload.{file_ext}",
+            content_type=file.content_type or "image/jpeg",
+            json_output_path=vision_json_path,
+        )
+
+        cat = str(ai_data.get("category", "unknown")).strip().lower()
+        col = str(ai_data.get("color", "unknown")).strip().lower()
+        style = str(ai_data.get("style", "unknown")).strip().lower()
+        title = str(ai_data.get("title", "")).strip()
+
+        if not cat:
+            cat = "unknown"
+        if not col:
+            col = "unknown"
+        if not style:
+            style = "unknown"
+
+        new_title = title or f"{col.capitalize()} {cat.capitalize()}"
+
+        new_id = insert_user_wardrobe_item(
+            title=new_title,
+            category=cat,
+            color=col,
+            style=style,
+            image_url=public_image_url,
+            vision_source=vision_source,
+            vision_payload=ai_data,
+            vision_payload_path=vision_json_path,
+            owner_token=owner_token,
+        )
+
+        print(f"[UPLOAD] ✅ Успешно: {new_title} ({cat}, {col}, {style})")
+        return {
+            "status": "success",
+            "message": "Распознано и добавлено!",
+            "ai_analysis": ai_data,
+            "item": {
+                "id": new_id,
+                "title": new_title,
+                "category": cat,
+                "color": col,
+                "style": style,
+                "image_url": public_image_url,
+                "vision_source": vision_source,
+                "manually_edited": False,
             }
-            
+        }
+
+    except httpx.TimeoutException:
+        print("[VISION] ⏰ Таймаут соединения с vision-сервисом")
+        if public_image_url:
+            _safe_insert_unknown_item(public_image_url, owner_token, vision_json_path)
+        return {
+            "status": "success",
+            "message": "Таймаут vision-сервиса, сохранено как unknown"
+        }
+
+    except httpx.RequestError as e:
+        print(f"[VISION] 🌐 Ошибка запроса к vision-сервису: {type(e).__name__}: {e}")
+        if public_image_url:
+            _safe_insert_unknown_item(public_image_url, owner_token, vision_json_path)
+        return {
+            "status": "success",
+            "message": "Vision-сервис недоступен, сохранено как unknown"
+        }
+
     except Exception as e:
-        print(f"Ошибка: {e}")
-        return {"status": "error", "message": "Сбой сервера."}
+        print(f"[UPLOAD] Критическая ошибка: {type(e).__name__}: {e}")
+        if public_image_url:
+            _safe_insert_unknown_item(public_image_url, owner_token, vision_json_path)
+        return {
+            "status": "error",
+            "message": "Сбой сервера при загрузке"
+        }
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "backend.main:app",
+        host=os.getenv("APP_HOST", "0.0.0.0"),
+        port=int(os.getenv("APP_PORT", "8000")),
+        reload=False,
+    )

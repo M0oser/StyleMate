@@ -19,7 +19,22 @@
             }
         }
     </script>
+
     <style>
+        :root {
+            --ink: #111111;
+            --ink-soft: #666666;
+            --paper: rgba(255, 255, 255, 0.62);
+            --paper-strong: rgba(255, 255, 255, 0.82);
+            --line: rgba(255, 255, 255, 0.78);
+            --shadow-soft: 0 18px 48px rgba(17, 17, 17, 0.08);
+            --shadow-card: 0 14px 36px rgba(17, 17, 17, 0.06);
+        }
+
+        body {
+            color: var(--ink);
+        }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
@@ -30,6 +45,7 @@
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
         .animate-fade-up { animation: fadeUp 0.4s ease forwards; }
 
         .glass-bg {
@@ -39,9 +55,10 @@
             background-image: url('https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=1000&auto=format&fit=crop');
             background-size: cover;
             background-position: center;
-            opacity: 0.4;
+            opacity: 0.35;
             filter: grayscale(100%);
         }
+
         .glass-overlay {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
@@ -50,22 +67,117 @@
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
         }
+
+        .header-shell {
+            background: rgba(255, 255, 255, 0.6);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 28px rgba(17, 17, 17, 0.05);
+        }
+
+        .section-title {
+            letter-spacing: -0.04em;
+            line-height: 1;
+        }
+
+        .scenario-chip,
+        .gender-chip,
+        .source-chip,
+        .premium-button,
+        .nav-btn {
+            transition: transform 0.22s ease, box-shadow 0.22s ease, background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease;
+        }
+
+        .scenario-chip {
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            box-shadow: 0 8px 22px rgba(23, 19, 17, 0.04);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+
+        .scenario-chip:hover,
+        .gender-chip:hover,
+        .source-chip:hover,
+        .premium-button:hover {
+            transform: translateY(-1px);
+        }
+
+        .scenario-chip.active-chip,
+        .gender-chip.active-chip {
+            background: linear-gradient(135deg, #111111 0%, #232323 100%) !important;
+            color: #ffffff !important;
+            border-color: rgba(17, 17, 17, 0.08) !important;
+            box-shadow: 0 14px 30px rgba(17, 17, 17, 0.16);
+        }
+
+        .source-chip {
+            box-shadow: 0 10px 24px rgba(17, 17, 17, 0.04);
+        }
+
+        .source-chip.active-chip {
+            background: rgba(255, 255, 255, 0.92) !important;
+            border-color: rgba(17, 17, 17, 0.08) !important;
+            box-shadow: 0 14px 28px rgba(17, 17, 17, 0.06);
+        }
+
+        .premium-button {
+            background: linear-gradient(135deg, #111111 0%, #242424 100%);
+            box-shadow: 0 18px 34px rgba(17, 17, 17, 0.16);
+        }
+
+        .premium-button:hover {
+            box-shadow: 0 20px 42px rgba(17, 17, 17, 0.2);
+        }
+
+        .premium-panel {
+            background: rgba(255, 255, 255, 0.58);
+            border: 1px solid rgba(255, 255, 255, 0.72);
+            box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .outfit-note {
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.78);
+            box-shadow: var(--shadow-card);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .nav-shell {
+            background: rgba(255, 255, 255, 0.62);
+            border-color: rgba(255, 255, 255, 0.68);
+            box-shadow: 0 -12px 30px rgba(17, 17, 17, 0.06);
+        }
+
+        @media (max-width: 420px) {
+            .section-title {
+                font-size: 2.2rem;
+            }
+        }
     </style>
 </head>
-<body class="text-fashion font-sans antialiased pb-24 selection:bg-fashion selection:text-white">
+<body class="min-h-screen text-fashion font-sans antialiased pb-24 selection:bg-fashion selection:text-white">
 
     <div class="glass-bg"></div>
     <div class="glass-overlay"></div>
 
-    <header class="sticky top-0 z-40 bg-white/60 backdrop-blur-xl px-5 py-4 flex justify-between items-center border-b border-white/50">
+    <header class="header-shell sticky top-0 z-40 px-5 py-4 flex justify-between items-center border-b">
         <h1 class="text-xl font-bold tracking-tighter uppercase">StyleMate.</h1>
         <div class="w-8 h-8 bg-white/80 shadow-sm rounded-full flex items-center justify-center text-sm">✨</div>
     </header>
 
     <main id="tab-outfit" class="tab-content active px-5 py-4">
-        <div class="mb-8">
-            <h2 class="text-3xl font-bold tracking-tight mb-2">Твой стиль</h2>
-            <p class="text-gray-600 text-sm font-medium">Выбери повод, ИИ сделает остальное.</p>
+        <div class="mb-9 pt-2">
+            <div class="flex items-start justify-between gap-4 mb-2">
+                <h2 class="section-title text-3xl font-bold tracking-tight">Твой стиль</h2>
+                <div class="premium-panel flex items-center gap-2 rounded-2xl p-1.5">
+                    <button type="button" class="gender-chip active-chip bg-fashion text-white w-9 h-9 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95" data-value="male">М</button>
+                    <button type="button" class="gender-chip bg-white text-gray-500 border border-gray-200 w-9 h-9 rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95" data-value="female">Ж</button>
+                </div>
+                <input type="hidden" id="gender-input" value="male">
+            </div>
+            <p class="max-w-[16rem] text-sm text-gray-600 font-medium leading-relaxed">Выбери повод и источник вещей, ИИ соберет аккуратный образ под твой запрос.</p>
         </div>
 
         <form id="outfit-form" class="space-y-6 mb-8">
@@ -82,7 +194,31 @@
                 <input type="text" id="custom-scenario-text" placeholder="Например: Поход в горы с друзьями..." class="w-full bg-white/80 backdrop-blur shadow-sm border border-gray-200 text-fashion py-3.5 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-fashion">
             </div>
 
-            <button id="submit-btn" type="submit" class="w-full bg-fashion text-white font-semibold text-sm uppercase tracking-wide py-4 rounded-2xl shadow-xl shadow-black/10 hover:bg-black active:scale-[0.98] transition-all">
+            <div class="premium-panel rounded-[1.75rem] p-4">
+                <div class="flex items-start justify-between gap-4 mb-3">
+                    <div>
+                        <p class="text-sm font-semibold text-fashion">Источник вещей</p>
+                        <p class="text-xs text-gray-500 mt-1">Выбери, откуда собирать образ.</p>
+                    </div>
+                    <input type="hidden" id="source-mode" value="mixed">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5" id="source-toggle">
+                    <button type="button" class="source-chip text-left bg-white/70 text-gray-600 border border-transparent rounded-2xl px-4 py-3 shadow-sm transition-all active:scale-[0.98]" data-value="user">
+                        <span class="block text-sm font-semibold">Личный</span>
+                        <span class="block text-xs text-gray-500 mt-1">Только твои вещи</span>
+                    </button>
+                    <button type="button" class="source-chip text-left bg-white/70 text-gray-600 border border-transparent rounded-2xl px-4 py-3 shadow-sm transition-all active:scale-[0.98]" data-value="shop">
+                        <span class="block text-sm font-semibold">Каталог</span>
+                        <span class="block text-xs text-gray-500 mt-1">Вещи из базы магазина</span>
+                    </button>
+                    <button type="button" class="source-chip active-chip text-left bg-white text-fashion border border-gray-200/80 rounded-2xl px-4 py-3 shadow-sm transition-all active:scale-[0.98]" data-value="mixed">
+                        <span class="block text-sm font-semibold">Смешанный</span>
+                        <span class="block text-xs text-gray-500 mt-1">Гардероб и каталог вместе</span>
+                    </button>
+                </div>
+            </div>
+
+            <button id="submit-btn" type="submit" class="premium-button w-full text-white font-semibold text-sm uppercase tracking-[0.2em] py-4 rounded-[1.4rem] active:scale-[0.98] transition-all">
                 Сгенерировать образ
             </button>
         </form>
@@ -92,14 +228,10 @@
             <div class="animate-pulse delay-75"><div class="bg-white/50 aspect-[4/5] rounded-2xl mb-3"></div></div>
         </div>
 
-        <div id="results-container" class="hidden">
-            <!-- Сюда вставится объяснение ИИ и сетка с вещами -->
-        </div>
+        <div id="results-container" class="hidden"></div>
     </main>
 
-    <main id="tab-wardrobe" class="tab-content px-5 py-4">
-        <!-- Контент гардероба будет загружен через JS -->
-    </main>
+    <main id="tab-wardrobe" class="tab-content px-5 py-4"></main>
 
     <main id="tab-favorites" class="tab-content px-5 py-4">
         <h2 class="text-3xl font-bold tracking-tight mb-2">Избранное</h2>
@@ -108,11 +240,10 @@
         <div id="favorites-empty" class="text-center py-10">
             <p class="text-gray-500 text-sm">Ты еще ничего не добавил в избранное.</p>
         </div>
-        <div id="favorites-grid" class="grid grid-cols-2 gap-x-4 gap-y-6 hidden">
-        </div>
+        <div id="favorites-grid" class="grid grid-cols-2 gap-x-4 gap-y-6 hidden"></div>
     </main>
 
-    <nav class="fixed bottom-0 w-full bg-white/80 backdrop-blur-xl border-t border-gray-100 pb-safe z-50">
+    <nav class="nav-shell fixed bottom-0 w-full backdrop-blur-xl border-t pb-safe z-50">
         <div class="flex justify-around items-center h-20 px-4">
             <button onclick="switchTab('wardrobe')" id="btn-wardrobe" class="nav-btn flex flex-col items-center text-gray-400 transition-all">
                 <svg class="w-6 h-6 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
@@ -129,19 +260,122 @@
         </div>
     </nav>
 
+    <div id="wardrobe-editor-modal" class="hidden fixed inset-0 z-[60] bg-black/35 backdrop-blur-sm px-4 py-6">
+        <div class="max-w-md mx-auto bg-white rounded-[1.75rem] shadow-2xl border border-white/80 p-5 mt-10">
+            <div class="flex items-start justify-between gap-4 mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold tracking-tight">Редактировать вещь</h3>
+                    <p class="text-xs text-gray-500 mt-1">Если модель ошиблась, параметры можно поправить вручную.</p>
+                </div>
+                <button type="button" onclick="closeWardrobeEditor()" class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 text-sm font-bold">×</button>
+            </div>
+
+            <div class="space-y-4">
+                <input type="hidden" id="edit-item-id">
+
+                <div>
+                    <label for="edit-item-title" class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Название</label>
+                    <input id="edit-item-title" type="text" class="w-full bg-white border border-gray-200 text-fashion py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-fashion">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="edit-item-category" class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Категория</label>
+                        <select id="edit-item-category" class="w-full bg-white border border-gray-200 text-fashion py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-fashion"></select>
+                    </div>
+                    <div>
+                        <label for="edit-item-color" class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Цвет</label>
+                        <select id="edit-item-color" class="w-full bg-white border border-gray-200 text-fashion py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-fashion"></select>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="edit-item-style" class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Стилистика</label>
+                    <select id="edit-item-style" class="w-full bg-white border border-gray-200 text-fashion py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-fashion"></select>
+                </div>
+
+                <div id="edit-item-meta" class="text-xs text-gray-500 bg-gray-50 rounded-2xl px-4 py-3"></div>
+
+                <div class="flex gap-3 pt-1">
+                    <button type="button" onclick="deleteSingleWardrobeItem()" class="bg-white border border-red-200 text-red-600 font-medium py-3 px-4 rounded-xl">Удалить</button>
+                    <button type="button" onclick="closeWardrobeEditor()" class="w-full bg-gray-100 text-gray-700 font-medium py-3 rounded-xl">Отмена</button>
+                    <button type="button" onclick="saveWardrobeItem()" class="premium-button w-full text-white font-semibold py-3 rounded-xl">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        tg.ready();
+        const tg = window.Telegram?.WebApp || null;
+        if (tg) {
+            tg.expand();
+            tg.ready();
+        }
 
         let lastGeneratedScenario = null;
         let favorites = [];
+        let wardrobeItemsCache = [];
+        let wardrobeSelectionMode = false;
+        let selectedWardrobeIds = new Set();
+
+        const CATEGORY_OPTIONS = [
+            'unknown', 'tshirt', 'shirt', 'sweater', 'hoodie',
+            'jeans', 'trousers', 'shorts', 'skirt',
+            'sneakers', 'boots', 'shoes', 'loafers',
+            'jacket', 'coat', 'blazer'
+        ];
+
+        const COLOR_OPTIONS = [
+            'unknown', 'black', 'white', 'gray', 'navy', 'blue',
+            'beige', 'brown', 'red', 'green', 'pink', 'purple',
+            'yellow', 'orange'
+        ];
+
+        const STYLE_OPTIONS = [
+            'unknown', 'minimal', 'casual', 'sport', 'classic',
+            'formal', 'streetwear', 'romantic', 'technical', 'old_money'
+        ];
 
         const chips = document.querySelectorAll('.scenario-chip');
         const hiddenInput = document.getElementById('scenario');
         const customInputContainer = document.getElementById('custom-input-container');
         const customInputText = document.getElementById('custom-scenario-text');
         const submitBtn = document.getElementById('submit-btn');
+        const genderChips = document.querySelectorAll('.gender-chip');
+        const genderInput = document.getElementById('gender-input');
+        const sourceModeInput = document.getElementById('source-mode');
+        const sourceChips = document.querySelectorAll('.source-chip');
+
+        function ensureOwnerToken() {
+            const storageKey = 'stylemate_owner_token';
+            let token = localStorage.getItem(storageKey);
+
+            if (!token) {
+                token = window.crypto?.randomUUID
+                    ? window.crypto.randomUUID()
+                    : `owner_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+                localStorage.setItem(storageKey, token);
+            }
+
+            return token;
+        }
+
+        function ownerHeaders(extraHeaders = {}) {
+            return {
+                'X-Owner-Token': ensureOwnerToken(),
+                ...extraHeaders,
+            };
+        }
+
+        function fillSelectOptions(selectEl, values) {
+            selectEl.innerHTML = values.map(value => `
+                <option value="${value}">${value}</option>
+            `).join('');
+        }
+
+        fillSelectOptions(document.getElementById('edit-item-category'), CATEGORY_OPTIONS);
+        fillSelectOptions(document.getElementById('edit-item-color'), COLOR_OPTIONS);
+        fillSelectOptions(document.getElementById('edit-item-style'), STYLE_OPTIONS);
 
         chips.forEach(chip => {
             chip.addEventListener('click', () => {
@@ -149,6 +383,7 @@
                     c.classList.remove('bg-fashion', 'text-white', 'active-chip');
                     c.classList.add('bg-white/80', 'text-gray-600');
                 });
+
                 chip.classList.remove('bg-white/80', 'text-gray-600');
                 chip.classList.add('bg-fashion', 'text-white', 'active-chip');
 
@@ -161,22 +396,59 @@
                     customInputContainer.classList.add('hidden');
                     hiddenInput.value = val;
                 }
+
                 updateButtonText();
             });
         });
 
         customInputText.addEventListener('input', (e) => {
-            if (document.querySelector('.active-chip').dataset.value === 'custom') {
+            if (document.querySelector('.scenario-chip.active-chip')?.dataset.value === 'custom') {
                 hiddenInput.value = e.target.value;
                 updateButtonText();
             }
         });
 
+        genderChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                genderChips.forEach(c => {
+                    c.classList.remove('bg-fashion', 'text-white', 'active-chip');
+                    c.classList.add('bg-white', 'text-gray-500', 'border', 'border-gray-200');
+                });
+
+                chip.classList.remove('bg-white', 'text-gray-500', 'border', 'border-gray-200');
+                chip.classList.add('bg-fashion', 'text-white', 'active-chip');
+                genderInput.value = chip.dataset.value;
+            });
+        });
+
+        sourceChips.forEach(chip => {
+            chip.addEventListener('click', () => {
+                sourceChips.forEach(c => {
+                    c.classList.remove('active-chip', 'bg-white', 'text-fashion', 'border-gray-200/80');
+                    c.classList.add('bg-white/70', 'text-gray-600', 'border-transparent');
+                });
+
+                chip.classList.remove('bg-white/70', 'text-gray-600', 'border-transparent');
+                chip.classList.add('active-chip', 'bg-white', 'text-fashion', 'border-gray-200/80');
+                sourceModeInput.value = chip.dataset.value;
+                updateButtonText();
+            });
+        });
+
+        function sourceModeLabel(value) {
+            if (value === 'user') return 'личный гардероб';
+            if (value === 'shop') return 'каталог магазина';
+            if (value === 'mixed') return 'смешанный режим';
+            return 'источник';
+        }
+
         function updateButtonText() {
+            const modeText = sourceModeLabel(sourceModeInput.value);
+
             if (hiddenInput.value && hiddenInput.value === lastGeneratedScenario) {
-                submitBtn.innerText = "Подобрать новый образ";
+                submitBtn.innerText = `Подобрать новый образ (${modeText})`;
             } else {
-                submitBtn.innerText = "Сгенерировать образ";
+                submitBtn.innerText = `Сгенерировать образ (${modeText})`;
             }
         }
 
@@ -192,48 +464,183 @@
             activeBtn.classList.remove('text-gray-400');
             activeBtn.classList.add('text-fashion', 'scale-110');
 
-            if(tabName === 'favorites') renderFavorites();
-            if(tabName === 'wardrobe') loadMyWardrobe(); 
+            if (tabName === 'favorites') renderFavorites();
+            if (tabName === 'wardrobe') loadMyWardrobe();
         }
+
+        function resetWardrobeSelectionState() {
+            wardrobeSelectionMode = false;
+            selectedWardrobeIds = new Set();
+        }
+
+        window.toggleWardrobeSelectionMode = function(forceState = null) {
+            wardrobeSelectionMode = forceState === null ? !wardrobeSelectionMode : Boolean(forceState);
+            if (!wardrobeSelectionMode) {
+                selectedWardrobeIds = new Set();
+            }
+            loadMyWardrobe();
+        };
+
+        window.toggleWardrobeSelection = function(itemId) {
+            if (selectedWardrobeIds.has(itemId)) {
+                selectedWardrobeIds.delete(itemId);
+            } else {
+                selectedWardrobeIds.add(itemId);
+            }
+            loadMyWardrobe();
+        };
+
+        window.handleWardrobeCardClick = function(itemStr, itemId) {
+            if (wardrobeSelectionMode) {
+                toggleWardrobeSelection(itemId);
+                return;
+            }
+
+            openWardrobeEditor(itemStr);
+        };
+
+        async function deleteWardrobeItems(itemIds) {
+            if (!itemIds.length) return;
+
+            const response = await fetch('/api/my_wardrobe/bulk_delete', {
+                method: 'POST',
+                headers: ownerHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ item_ids: itemIds })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error ${response.status}`);
+            }
+
+            closeWardrobeEditor();
+            resetWardrobeSelectionState();
+            await loadMyWardrobe();
+        }
+
+        window.deleteSelectedWardrobeItems = async function() {
+            const itemIds = Array.from(selectedWardrobeIds);
+            if (!itemIds.length) return;
+
+            const confirmed = window.confirm(`Удалить выбранные вещи: ${itemIds.length} шт.?`);
+            if (!confirmed) return;
+
+            try {
+                await deleteWardrobeItems(itemIds);
+            } catch (error) {
+                console.error('Ошибка удаления выбранных вещей:', error);
+                alert('Не удалось удалить выбранные вещи.');
+            }
+        };
+
+        window.deleteAllWardrobeItems = async function() {
+            const total = wardrobeItemsCache.length;
+            if (!total) return;
+
+            const confirmed = window.confirm(`Удалить весь гардероб (${total} вещей)? Это действие нельзя отменить.`);
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch('/api/my_wardrobe', {
+                    method: 'DELETE',
+                    headers: ownerHeaders()
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+
+                closeWardrobeEditor();
+                resetWardrobeSelectionState();
+                await loadMyWardrobe();
+            } catch (error) {
+                console.error('Ошибка полной очистки гардероба:', error);
+                alert('Не удалось очистить гардероб.');
+            }
+        };
 
         async function loadMyWardrobe() {
             const container = document.querySelector('#tab-wardrobe');
-            
+
             try {
-                const response = await fetch('/api/my_wardrobe');
+                const response = await fetch('/api/my_wardrobe', {
+                    headers: ownerHeaders()
+                });
                 const data = await response.json();
-                
+                wardrobeItemsCache = data;
+                const existingIds = new Set(data.map(item => item.id));
+                selectedWardrobeIds = new Set(
+                    Array.from(selectedWardrobeIds).filter(itemId => existingIds.has(itemId))
+                );
+
+                if (data.length === 0) {
+                    resetWardrobeSelectionState();
+                }
+
+                const selectedCount = selectedWardrobeIds.size;
+                const hasItems = data.length > 0;
+
                 let html = `
                     <div class="flex justify-between items-end mb-6">
                         <div>
                             <h2 class="text-3xl font-bold tracking-tight mb-2">Мой Гардероб</h2>
                             <p class="text-gray-600 text-sm font-medium">Твои оцифрованные вещи: ${data.length}</p>
                         </div>
-                        <button onclick="document.getElementById('native-file-input').click()" class="bg-fashion text-white w-10 h-10 rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-all">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                        </button>
+                        <div class="flex items-center gap-2">
+                            ${hasItems ? `
+                                <button onclick="toggleWardrobeSelectionMode(${wardrobeSelectionMode ? 'false' : 'true'})" class="bg-white/85 border border-white text-fashion font-medium text-sm px-4 py-2.5 rounded-full shadow-[0_10px_24px_rgba(23,19,17,0.05)] active:scale-95 transition-all">
+                                    ${wardrobeSelectionMode ? 'Готово' : 'Выбрать'}
+                                </button>
+                            ` : ''}
+                            <button onclick="document.getElementById('native-file-input').click()" class="premium-button text-white w-11 h-11 rounded-2xl flex items-center justify-center active:scale-95 transition-all">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                            </button>
+                        </div>
                     </div>
                 `;
 
+                if (wardrobeSelectionMode && hasItems) {
+                    html += `
+                        <div class="premium-panel rounded-[1.6rem] p-4 mb-5">
+                            <div class="flex items-start justify-between gap-3 mb-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-fashion">Режим выбора</p>
+                                    <p class="text-xs text-gray-500 mt-1">Отметь вещи, которые хочешь удалить.</p>
+                                </div>
+                                <div class="text-sm font-semibold text-fashion">${selectedCount}</div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="deleteSelectedWardrobeItems()" class="bg-fashion text-white font-medium text-sm px-4 py-3 rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed" ${selectedCount === 0 ? 'disabled' : ''}>
+                                    Удалить выбранные
+                                </button>
+                                <button onclick="deleteAllWardrobeItems()" class="bg-white/90 border border-gray-200 text-red-600 font-medium text-sm px-4 py-3 rounded-2xl">
+                                    Удалить все
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 if (data.length === 0) {
                     html += `
-                    <div class="bg-white/60 backdrop-blur rounded-3xl border border-white p-10 flex flex-col items-center justify-center text-center shadow-sm mt-8">
-                        <div class="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center text-2xl mb-4">📸</div>
-                        <h3 class="font-semibold mb-1" id="wardrobe-title">Гардероб пуст</h3>
-                        <p class="text-gray-500 text-sm mb-6" id="wardrobe-desc">Добавь вещи, чтобы ИИ смог с ними работать.</p>
-                        <button onclick="document.getElementById('native-file-input').click()" class="bg-white border border-gray-200 text-fashion font-medium text-sm px-6 py-3 rounded-full shadow-sm active:scale-95 transition-all w-full">
-                            + Добавить вещь
-                        </button>
-                    </div>`;
+                        <div class="premium-panel rounded-[2rem] p-10 flex flex-col items-center justify-center text-center mt-8">
+                            <div class="w-16 h-16 bg-white/85 rounded-[1.4rem] shadow-[0_12px_24px_rgba(23,19,17,0.06)] flex items-center justify-center text-2xl mb-4">📸</div>
+                            <h3 class="font-semibold mb-1" id="wardrobe-title">Гардероб пуст</h3>
+                            <p class="text-gray-500 text-sm mb-6" id="wardrobe-desc">Добавь вещи, чтобы ИИ смог с ними работать.</p>
+                            <button onclick="document.getElementById('native-file-input').click()" class="bg-white/85 border border-white text-fashion font-medium text-sm px-6 py-3 rounded-full shadow-[0_10px_24px_rgba(23,19,17,0.05)] active:scale-95 transition-all w-full">
+                                + Добавить вещь
+                            </button>
+                        </div>
+                    `;
                 } else {
                     html += `<div class="grid grid-cols-3 gap-3">`;
+
                     data.forEach((item, index) => {
+                        const itemDataStr = encodeURIComponent(JSON.stringify(item));
+                        const isSelected = selectedWardrobeIds.has(item.id);
                         let imageHtml = '';
+
                         if (item.image_url) {
-                            // Если есть картинка - показываем ее
                             imageHtml = `<img src="${item.image_url}" class="w-full h-full object-cover rounded-2xl">`;
                         } else {
-                            // Иначе показываем эмодзи заглушку
                             let icon = '👕';
                             const cat = item.category ? item.category.toLowerCase() : '';
                             if (cat.includes('shoes') || cat.includes('sneakers')) icon = '👟';
@@ -243,25 +650,42 @@
                         }
 
                         html += `
-                            <div class="group cursor-pointer animate-fade-up flex flex-col items-center" style="animation-delay: ${index * 0.05}s">
-                                <div class="w-full aspect-square bg-white rounded-2xl shadow-sm border border-gray-100 mb-2 relative overflow-hidden">
+                            <div onclick="handleWardrobeCardClick('${itemDataStr}', ${item.id})" class="group cursor-pointer animate-fade-up flex flex-col items-center" style="animation-delay: ${index * 0.05}s">
+                                <div class="w-full aspect-square bg-white/80 backdrop-blur rounded-[1.35rem] shadow-[0_14px_32px_rgba(23,19,17,0.06)] border ${isSelected ? 'border-fashion ring-2 ring-fashion/20' : 'border-white/80'} mb-2 relative overflow-hidden">
                                     ${imageHtml}
+                                    <div class="absolute top-2 left-2 px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-white/90 text-gray-600 shadow-sm">
+                                        ${item.vision_source || 'vision'}
+                                    </div>
+                                    ${wardrobeSelectionMode ? `
+                                        <div class="absolute inset-0 bg-black/10"></div>
+                                        <div class="absolute top-2 right-2 w-6 h-6 rounded-full border ${isSelected ? 'bg-fashion border-fashion text-white' : 'bg-white/90 border-white text-transparent'} flex items-center justify-center shadow-sm text-xs font-bold">
+                                            ✓
+                                        </div>
+                                    ` : ''}
+                                    ${item.manually_edited ? `
+                                        <div class="absolute ${wardrobeSelectionMode ? 'bottom-2 right-2' : 'top-2 right-2'} px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-fashion text-white shadow-sm">
+                                            edited
+                                        </div>
+                                    ` : ''}
                                 </div>
                                 <span class="text-[10px] font-bold text-gray-700 uppercase tracking-tight text-center leading-tight">
                                     ${item.color || ''} <br> ${item.category || 'вещь'}
                                 </span>
+                                <span class="text-[10px] text-gray-400 mt-1 text-center leading-tight">
+                                    ${item.style || 'unknown'}
+                                </span>
                             </div>
                         `;
                     });
+
                     html += `</div>`;
                     html += `<div class="mt-6 text-center"><h3 class="font-semibold mb-1" id="wardrobe-title"></h3><p class="text-gray-500 text-sm" id="wardrobe-desc"></p></div>`;
                 }
 
                 html += `<input type="file" id="native-file-input" accept="image/*" class="hidden">`;
-                container.innerHTML = html;
-                
-                document.getElementById('native-file-input').addEventListener('change', window.handleUpload);
 
+                container.innerHTML = html;
+                document.getElementById('native-file-input').addEventListener('change', window.handleUpload);
             } catch (error) {
                 console.error("Ошибка загрузки гардероба:", error);
             }
@@ -279,8 +703,93 @@
                 favorites.splice(index, 1);
                 svg.classList.remove('text-red-500', 'fill-current');
             }
+
             if (document.getElementById('tab-favorites').classList.contains('active')) {
                 renderFavorites();
+            }
+        };
+
+        window.openWardrobeEditor = function(itemStr) {
+            const item = JSON.parse(decodeURIComponent(itemStr));
+            document.getElementById('edit-item-id').value = item.id;
+            document.getElementById('edit-item-title').value = item.title || '';
+            document.getElementById('edit-item-category').value = item.category || 'unknown';
+            document.getElementById('edit-item-color').value = item.color || 'unknown';
+            document.getElementById('edit-item-style').value = item.style || 'unknown';
+
+            const sourceText = item.vision_source ? `Источник распознавания: ${item.vision_source}` : 'Источник распознавания: неизвестен';
+            const manualText = item.manually_edited ? 'Изменено вручную: да' : 'Изменено вручную: нет';
+            document.getElementById('edit-item-meta').innerText = `${sourceText}\n${manualText}`;
+
+            document.getElementById('wardrobe-editor-modal').classList.remove('hidden');
+        };
+
+        window.closeWardrobeEditor = function() {
+            document.getElementById('wardrobe-editor-modal').classList.add('hidden');
+        };
+
+        window.deleteSingleWardrobeItem = async function() {
+            const itemId = Number(document.getElementById('edit-item-id').value);
+            if (!itemId) return;
+
+            const confirmed = window.confirm('Удалить эту вещь из гардероба?');
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(`/api/my_wardrobe/${itemId}`, {
+                    method: 'DELETE',
+                    headers: ownerHeaders()
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+
+                closeWardrobeEditor();
+                await loadMyWardrobe();
+            } catch (error) {
+                console.error('Ошибка удаления вещи:', error);
+                alert('Не удалось удалить вещь.');
+            }
+        };
+
+        document.getElementById('wardrobe-editor-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'wardrobe-editor-modal') {
+                closeWardrobeEditor();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeWardrobeEditor();
+            }
+        });
+
+        window.saveWardrobeItem = async function() {
+            const itemId = document.getElementById('edit-item-id').value;
+            const payload = {
+                title: document.getElementById('edit-item-title').value.trim() || 'Новая вещь',
+                category: document.getElementById('edit-item-category').value,
+                color: document.getElementById('edit-item-color').value,
+                style: document.getElementById('edit-item-style').value,
+            };
+
+            try {
+                const response = await fetch(`/api/my_wardrobe/${itemId}`, {
+                    method: 'PUT',
+                    headers: ownerHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error ${response.status}`);
+                }
+
+                closeWardrobeEditor();
+                await loadMyWardrobe();
+            } catch (error) {
+                console.error('Ошибка обновления вещи:', error);
+                alert('Не удалось сохранить изменения.');
             }
         };
 
@@ -307,10 +816,12 @@
                     const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category}`;
 
                     card.innerHTML = `
-                        <div class="relative aspect-[4/5] bg-white rounded-2xl overflow-hidden mb-3 shadow-sm border border-gray-100">
+                        <div class="relative aspect-[4/5] bg-white/80 backdrop-blur rounded-[1.35rem] overflow-hidden mb-3 shadow-[0_14px_32px_rgba(23,19,17,0.07)] border border-white/80">
                             <img src="${imgUrl}" class="w-full h-full object-cover">
                             <button onclick="toggleFavorite(this, '${itemDataStr}')" class="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-red-500 fill-current shadow-sm transition-transform active:scale-75">
-                                <svg class="w-4 h-4 text-red-500 fill-current" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
+                                <svg class="w-4 h-4 text-red-500 fill-current" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path>
+                                </svg>
                             </button>
                         </div>
                         <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${item.title}</p>
@@ -321,10 +832,29 @@
             }
         }
 
+        function renderNoOutfitState(explanation, currentSourceMode) {
+            const resultsContainer = document.getElementById('results-container');
+
+            resultsContainer.innerHTML = `
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold tracking-tight mb-3">Результат подбора</h3>
+                    <div class="outfit-note p-4 rounded-[1.5rem]">
+                        <p class="text-xs uppercase tracking-wider text-gray-400 mb-2">Источник: ${sourceModeLabel(currentSourceMode)}</p>
+                        <p class="text-sm text-gray-700 leading-relaxed">${explanation}</p>
+                    </div>
+                </div>
+            `;
+
+            resultsContainer.classList.remove('hidden');
+        }
+
         document.getElementById('outfit-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const currentScenario = hiddenInput.value;
+            const currentSourceMode = sourceModeInput.value;
+            const currentGender = genderInput.value;
+
             if (!currentScenario) return;
 
             const skeleton = document.getElementById('skeleton-loader');
@@ -337,80 +867,96 @@
             try {
                 const response = await fetch('/api/generate_outfits', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
+                    headers: ownerHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({
                         scenario: currentScenario,
-                        style: "Minimal", 
-                        count: 1 
+                        style: "Minimal",
+                        gender: currentGender,
+                        count: 1,
+                        source_mode: currentSourceMode
                     })
                 });
 
-                if (!response.ok) throw new Error('HTTP error ' + response.status);
+                if (!response.ok) {
+                    throw new Error('HTTP error ' + response.status);
+                }
+
                 const data = await response.json();
 
-                if (data.outfits && data.outfits.length > 0) {
-                    const bestOutfit = data.outfits[0];
-                    const aiExplanation = bestOutfit.explanation ? bestOutfit.explanation : "Идеальное сочетание для вашего запроса.";
-                    
-                    let htmlContent = `
-                        <div class="mb-4">
-                            <h3 class="text-lg font-semibold tracking-tight mb-2">Выбор стилиста</h3>
-                            <div class="bg-white/80 backdrop-blur p-4 rounded-xl border border-gray-100 shadow-sm">
-                                <p class="text-sm text-gray-700 italic leading-relaxed">«${aiExplanation}»</p>
-                            </div>
-                        </div>
-                        <div class="grid grid-cols-2 gap-x-4 gap-y-6">
-                    `;
+                if (!data.outfits || data.outfits.length === 0) {
+                    throw new Error("Сервер вернул пустой ответ");
+                }
 
-                    if (!bestOutfit.items || bestOutfit.items.length === 0) {
-                        throw new Error("Нейросеть вернула пустой список вещей (items is empty)");
-                    }
+                const bestOutfit = data.outfits[0];
+                const aiExplanation = bestOutfit.explanation || "Не удалось подобрать образ.";
 
-                    bestOutfit.items.forEach((item, index) => {
-                        if (!item.id) item.id = 'item_' + Math.random().toString(36).substr(2, 9);
-
-                        const isFav = favorites.some(f => f.id === item.id);
-                        const heartClass = isFav ? "text-red-500 fill-current" : "text-gray-400";
-                        const price = item.price ? item.price : '0.00';
-                        const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category || 'clothes'}`;
-                        
-                        const safeItem = {
-                            id: item.id,
-                            title: item.title || 'Без названия',
-                            category: item.category || 'unknown',
-                            price: price,
-                            image_url: imgUrl
-                        };
-                        const itemDataStr = encodeURIComponent(JSON.stringify(safeItem));
-
-                        htmlContent += `
-                            <div class="group cursor-pointer animate-fade-up" style="animation-delay: ${index * 0.1}s">
-                                <div class="relative aspect-[4/5] bg-white rounded-2xl overflow-hidden mb-3 shadow-sm border border-gray-100">
-                                    <img src="${imgUrl}" alt="${safeItem.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/400x500/eeeeee/999999?text=Error'">
-                                    <button onclick="toggleFavorite(this, '${itemDataStr}')" class="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-sm transition-transform active:scale-75 ${heartClass}">
-                                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
-                                    </button>
-                                </div>
-                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">${safeItem.category}</h4>
-                                <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${safeItem.title}</p>
-                                <p class="text-sm font-bold text-fashion">$${safeItem.price}</p>
-                            </div>
-                        `;
-                    });
-
-                    htmlContent += `</div>`;
-                    resultsContainer.innerHTML = htmlContent;
-
+                if (!bestOutfit.items || bestOutfit.items.length === 0) {
+                    renderNoOutfitState(aiExplanation, currentSourceMode);
                     lastGeneratedScenario = currentScenario;
                     updateButtonText();
-                    resultsContainer.classList.remove('hidden');
+                    return;
                 }
+
+                let htmlContent = `
+                    <div class="mb-4">
+                        <h3 class="text-lg font-semibold tracking-tight mb-3">Выбор стилиста</h3>
+                        <div class="outfit-note p-4 rounded-[1.5rem]">
+                            <p class="text-xs uppercase tracking-wider text-gray-400 mb-2">Источник: ${sourceModeLabel(currentSourceMode)}</p>
+                            <p class="text-sm text-gray-700 italic leading-relaxed">«${aiExplanation}»</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-6">
+                `;
+
+                bestOutfit.items.forEach((item, index) => {
+                    if (!item.id) item.id = 'item_' + Math.random().toString(36).substr(2, 9);
+
+                    const isFav = favorites.some(f => f.id === item.id);
+                    const heartClass = isFav ? "text-red-500 fill-current" : "text-gray-400";
+                    const price = item.price ? item.price : '0.00';
+                    const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category || 'clothes'}`;
+
+                    const safeItem = {
+                        id: item.id,
+                        title: item.title || 'Без названия',
+                        category: item.category || 'unknown',
+                        price: price,
+                        image_url: imgUrl
+                    };
+
+                    const itemDataStr = encodeURIComponent(JSON.stringify(safeItem));
+
+                    htmlContent += `
+                        <div class="group cursor-pointer animate-fade-up" style="animation-delay: ${index * 0.1}s">
+                            <div class="relative aspect-[4/5] bg-white/80 backdrop-blur overflow-hidden mb-3 rounded-[1.35rem] border border-white/80 shadow-[0_14px_32px_rgba(23,19,17,0.07)]">
+                                <img src="${imgUrl}" alt="${safeItem.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/400x500/eeeeee/999999?text=Error'">
+                                <button onclick="toggleFavorite(this, '${itemDataStr}')" class="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-sm transition-transform active:scale-75 ${heartClass}">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">${safeItem.category}</h4>
+                            <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${safeItem.title}</p>
+                            <p class="text-sm font-bold text-fashion">$${safeItem.price}</p>
+                        </div>
+                    `;
+                });
+
+                htmlContent += `</div>`;
+                resultsContainer.innerHTML = htmlContent;
+
+                lastGeneratedScenario = currentScenario;
+                updateButtonText();
+                resultsContainer.classList.remove('hidden');
             } catch (error) {
                 console.error('Ошибка:', error);
-                resultsContainer.innerHTML = `<div class="bg-red-50 p-4 rounded-xl border border-red-200">
-                    <p class="text-red-600 text-sm font-bold mb-1">Сбой связи со стилистом:</p>
-                    <p class="text-red-500 text-xs break-words">${error.message}</p>
-                </div>`;
+                resultsContainer.innerHTML = `
+                    <div class="outfit-note p-4 rounded-[1.4rem]">
+                        <p class="text-red-600 text-sm font-bold mb-1">Сбой связи со стилистом:</p>
+                        <p class="text-red-500 text-xs break-words">${error.message}</p>
+                    </div>
+                `;
                 resultsContainer.classList.remove('hidden');
             } finally {
                 skeleton.classList.add('hidden');
@@ -423,9 +969,9 @@
 
             const wardrobeTitle = document.getElementById('wardrobe-title');
             const wardrobeDesc = document.getElementById('wardrobe-desc');
-            
-            if(wardrobeTitle) wardrobeTitle.innerText = "Идет распознавание...";
-            if(wardrobeDesc) wardrobeDesc.innerText = "Модель 5070 Ti анализирует ткань и цвет ⏳";
+
+            if (wardrobeTitle) wardrobeTitle.innerText = "Идет распознавание...";
+            if (wardrobeDesc) wardrobeDesc.innerText = "Модель анализирует вещь ⏳";
 
             const formData = new FormData();
             formData.append('file', file);
@@ -433,25 +979,32 @@
             try {
                 const response = await fetch('/api/upload_clothing', {
                     method: 'POST',
+                    headers: ownerHeaders(),
                     body: formData
                 });
 
                 const data = await response.json();
-                
+
                 if (data.status === "success") {
-                    loadMyWardrobe();
+                    resetWardrobeSelectionState();
+                    await loadMyWardrobe();
+                    if (data.item) {
+                        openWardrobeEditor(encodeURIComponent(JSON.stringify(data.item)));
+                    }
                 } else {
-                    if(wardrobeTitle) wardrobeTitle.innerText = "Ошибка 😔";
-                    if(wardrobeDesc) wardrobeDesc.innerText = data.message;
+                    if (wardrobeTitle) wardrobeTitle.innerText = "Ошибка 😔";
+                    if (wardrobeDesc) wardrobeDesc.innerText = data.message;
                 }
             } catch (error) {
                 console.error("Ошибка при загрузке:", error);
-                if(wardrobeTitle) wardrobeTitle.innerText = "Ошибка сети";
-                if(wardrobeDesc) wardrobeDesc.innerText = "Не удалось связаться с сервером.";
+                if (wardrobeTitle) wardrobeTitle.innerText = "Ошибка сети";
+                if (wardrobeDesc) wardrobeDesc.innerText = "Не удалось связаться с сервером.";
             } finally {
                 e.target.value = '';
             }
         };
+
+        updateButtonText();
 
         if (document.getElementById('tab-wardrobe').classList.contains('active')) {
             loadMyWardrobe();
