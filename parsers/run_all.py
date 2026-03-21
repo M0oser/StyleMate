@@ -13,6 +13,14 @@ from parsers.sela_parser import get_sela_products
 from parsers.zara_parser import get_zara_products
 from parsers.sneakerhead import get_sneakerhead_products
 
+SOURCE_PARSERS = [
+    ("sneakerhead", get_sneakerhead_products),
+    ("pavel_mazko", get_pavel_mazko_products),
+    ("zara", get_zara_products),
+    ("lime", get_lime_products),
+    ("sela", get_sela_products),
+]
+
 
 def save_products(products):
     saved = 0
@@ -29,9 +37,10 @@ def save_products(products):
     return saved, skipped
 
 
-def run_all_parsers():
+def collect_products_from_sources(source_parsers=None):
     all_products = []
     seen_urls = set()
+    source_parsers = source_parsers or SOURCE_PARSERS
 
     def extend_unique(products):
         for item in products:
@@ -41,40 +50,19 @@ def run_all_parsers():
             seen_urls.add(url)
             all_products.append(item)
 
-    try:
-        sneakerhead_products = get_sneakerhead_products()
-        print("sneakerhead found:", len(sneakerhead_products))
-        extend_unique(sneakerhead_products)
-    except Exception as e:
-        print("sneakerhead parser error:", e)
+    for source_name, parser_fn in source_parsers:
+        try:
+            products = parser_fn()
+            print(f"{source_name} found:", len(products))
+            extend_unique(products)
+        except Exception as e:
+            print(f"{source_name} parser error:", e)
 
-    try:
-        pavel_products = get_pavel_mazko_products()
-        print("pavel_mazko found:", len(pavel_products))
-        extend_unique(pavel_products)
-    except Exception as e:
-        print("pavel_mazko parser error:", e)
+    return all_products
 
-    try:
-        zara_products = get_zara_products()
-        print("zara found:", len(zara_products))
-        extend_unique(zara_products)
-    except Exception as e:
-        print("zara parser error:", e)
 
-    try:
-        lime_products = get_lime_products()
-        print("lime found:", len(lime_products))
-        extend_unique(lime_products)
-    except Exception as e:
-        print("lime parser error:", e)
-
-    try:
-        sela_products = get_sela_products()
-        print("sela found:", len(sela_products))
-        extend_unique(sela_products)
-    except Exception as e:
-        print("sela parser error:", e)
+def run_all_parsers():
+    all_products = collect_products_from_sources()
 
     saved, skipped = save_products(all_products)
 

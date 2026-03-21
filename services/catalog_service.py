@@ -20,7 +20,7 @@ ALLOWED_CATEGORIES = {
 }
 
 
-def get_catalog(limit=None, offset=0, category=None, source=None, query=None):
+def get_catalog(limit=None, offset=0, category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None):
     if category and category not in ALLOWED_CATEGORIES:
         raise ValueError("Unsupported category")
 
@@ -30,13 +30,39 @@ def get_catalog(limit=None, offset=0, category=None, source=None, query=None):
         category=category,
         source=source,
         query=query,
+        gender=gender,
+        style=style,
+        warmth=warmth,
+        weather_tag=weather_tag,
+        weather_profile=weather_profile,
+        water_resistant=water_resistant,
+        weather_rain=weather_rain,
+        weather_wind=weather_wind,
+        weather_snow=weather_snow,
+        weather_heat=weather_heat,
+        purpose_tag=purpose_tag,
     )
 
 
-def get_catalog_total(category=None, source=None, query=None):
+def get_catalog_total(category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None):
     if category and category not in ALLOWED_CATEGORIES:
         raise ValueError("Unsupported category")
-    return count_catalog_items(category=category, source=source, query=query)
+    return count_catalog_items(
+        category=category,
+        source=source,
+        query=query,
+        gender=gender,
+        style=style,
+        warmth=warmth,
+        weather_tag=weather_tag,
+        weather_profile=weather_profile,
+        water_resistant=water_resistant,
+        weather_rain=weather_rain,
+        weather_wind=weather_wind,
+        weather_snow=weather_snow,
+        weather_heat=weather_heat,
+        purpose_tag=purpose_tag,
+    )
 
 
 def get_catalog_sources():
@@ -54,4 +80,8 @@ def search_catalog(items, query):
         if q in item["title"].lower()
         or q in item["category"].lower()
         or (item.get("color") and q in item["color"].lower())
+        or (item.get("weather_tags") and q in item["weather_tags"].lower())
+        or (item.get("weather_profiles") and q in item["weather_profiles"].lower())
+        or (item.get("warmth") and q in item["warmth"].lower())
+        or (item.get("purpose_tags") and q in item["purpose_tags"].lower())
     ]

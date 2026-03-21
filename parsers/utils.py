@@ -143,6 +143,96 @@ SPORT_KEYWORDS = {
     "фитнес",
 }
 
+HOT_WEATHER_KEYWORDS = {
+    "breathable",
+    "lightweight",
+    "linen",
+    "summer",
+    "воздуш",
+    "дышащ",
+    "льня",
+    "летн",
+    "лёгк",
+}
+
+COLD_WEATHER_KEYWORDS = {
+    "down",
+    "fleece",
+    "insulated",
+    "merino",
+    "padded",
+    "puffer",
+    "quilted",
+    "thermal",
+    "warm",
+    "wool",
+    "утепл",
+    "пух",
+    "стеган",
+    "тепл",
+    "термо",
+    "флис",
+    "шерст",
+}
+
+RAIN_KEYWORDS = {
+    "dry",
+    "gore",
+    "membrane",
+    "rain",
+    "rubber",
+    "shell",
+    "water repellent",
+    "water-repellent",
+    "waterproof",
+    "weatherproof",
+    "влаг",
+    "дожд",
+    "мембран",
+    "непромока",
+    "прорезин",
+    "водоотталк",
+    "водонепрониц",
+}
+
+WIND_KEYWORDS = {
+    "anorak",
+    "hood",
+    "shell",
+    "wind",
+    "ветро",
+    "капюшон",
+    "шторм",
+}
+
+SNOW_KEYWORDS = {
+    "apres",
+    "cold",
+    "down",
+    "fleece",
+    "insulated",
+    "puffer",
+    "ski",
+    "snow",
+    "thermal",
+    "winter",
+    "зим",
+    "лыж",
+    "мороз",
+    "пух",
+    "снег",
+    "термо",
+    "утепл",
+}
+
+DEMI_KEYWORDS = {
+    "demi",
+    "midseason",
+    "transition",
+    "демисез",
+    "межсезон",
+}
+
 FORMAL_KEYWORDS = {
     "blazer",
     "classic",
@@ -366,7 +456,7 @@ def detect_category(*parts: Any) -> str:
     if any(word in text for word in ("свитер", "свитшот", "джемпер", "кардиган", "knit", "jumper", "sweater", "cardigan", "sweatshirt")):
         return "sweater"
 
-    if any(word in text for word in ("пальто", "плащ", "тренч", "coat", "trench", "puffer")):
+    if any(word in text for word in ("пальто", "плащ", "тренч", "парка", "parka", "coat", "trench", "puffer")):
         return "coat"
     if any(word in text for word in ("куртк", "бомбер", "жакет", "пиджак", "блейзер", "ветров", "jacket", "blazer", "bomber")):
         return "jacket"
@@ -396,6 +486,138 @@ def infer_style(*parts: Any, default: Optional[str] = None) -> str:
     return "casual"
 
 
+def contains_any_keyword(text: str, keywords: set) -> bool:
+    return any(word in text for word in keywords)
+
+
+def infer_warmth(*parts: Any, category: Optional[str] = None) -> str:
+    text = " ".join(normalize_text(part) for part in parts if part)
+
+    if contains_any_keyword(text, COLD_WEATHER_KEYWORDS | SNOW_KEYWORDS):
+        return "warm"
+
+    if category in {"coat", "jacket", "hoodie", "sweater", "boots"}:
+        if any(word in text for word in HOT_WEATHER_KEYWORDS):
+            return "light"
+        if any(word in text for word in DEMI_KEYWORDS | WIND_KEYWORDS):
+            return "mid"
+        return "mid"
+
+    if category in {"shorts", "tshirt", "top", "skirt", "dress", "sneakers", "shoes"}:
+        return "light"
+
+    return "mid"
+
+
+def infer_water_resistant(*parts: Any, category: Optional[str] = None) -> bool:
+    text = " ".join(normalize_text(part) for part in parts if part)
+    if contains_any_keyword(text, RAIN_KEYWORDS):
+        return True
+    return category in {"boots"} and any(word in text for word in WIND_KEYWORDS)
+
+
+def infer_weather_flags(*parts: Any, category: Optional[str] = None, style: Optional[str] = None) -> Dict[str, bool]:
+    text = " ".join(normalize_text(part) for part in parts if part)
+    warmth = infer_warmth(text, category=category)
+
+    rain = infer_water_resistant(text, category=category)
+    wind = (
+        contains_any_keyword(text, WIND_KEYWORDS)
+        or category in {"jacket", "coat"}
+        or (rain and category in {"jacket", "coat", "boots"})
+    )
+    snow = (
+        contains_any_keyword(text, SNOW_KEYWORDS)
+        or (warmth == "warm" and category in {"coat", "jacket", "boots"})
+    )
+    heat = (
+        contains_any_keyword(text, HOT_WEATHER_KEYWORDS)
+        or (warmth == "light" and category in {"tshirt", "top", "shirt", "shorts", "skirt", "dress"})
+    )
+
+    if style == "sport" and category in {"boots", "jacket", "coat"} and contains_any_keyword(text, {"outdoor", "trail", "technical"}):
+        rain = True
+        wind = True
+
+    return {
+        "rain": bool(rain),
+        "wind": bool(wind),
+        "snow": bool(snow),
+        "heat": bool(heat),
+    }
+
+
+def infer_weather_profiles(flags: Dict[str, bool], category: Optional[str] = None) -> list[str]:
+    profiles = set()
+
+    if flags["wind"] and flags["snow"]:
+        profiles.add("bad_weather")
+        profiles.add("winter_weather")
+    if flags["rain"] and flags["wind"]:
+        profiles.add("bad_weather")
+        profiles.add("wet_weather")
+    if flags["heat"] and flags["wind"]:
+        profiles.add("hot_weather")
+    if flags["heat"] and not flags["snow"]:
+        profiles.add("summer_weather")
+    if flags["snow"] and not flags["heat"]:
+        profiles.add("winter_weather")
+    if flags["wind"] and not flags["heat"]:
+        profiles.add("windy_weather")
+    if category in {"jacket", "coat", "boots"} and not flags["heat"]:
+        profiles.add("transitional_weather")
+
+    return sorted(profiles)
+
+
+def infer_weather_tags(flags: Dict[str, bool], warmth: str, category: Optional[str] = None) -> list[str]:
+    tags = set()
+    if flags["rain"]:
+        tags.add("rain")
+    if flags["wind"]:
+        tags.add("wind")
+    if flags["snow"]:
+        tags.add("snow")
+        tags.add("cold")
+    if flags["heat"]:
+        tags.add("hot")
+
+    if warmth == "warm":
+        tags.add("cold")
+    elif warmth == "light":
+        tags.add("hot")
+    else:
+        tags.add("mild")
+
+    if category in {"jacket", "coat", "boots"}:
+        tags.add("demi")
+
+    return sorted(tags)
+
+
+def infer_purpose_tags(*parts: Any, category: Optional[str] = None, style: Optional[str] = None) -> list[str]:
+    text = " ".join(normalize_text(part) for part in parts if part)
+    tags = set()
+
+    if style == "sport" or contains_any_keyword(text, SPORT_KEYWORDS):
+        tags.add("sport")
+        tags.add("gym")
+    if style == "formal" or contains_any_keyword(text, FORMAL_KEYWORDS):
+        tags.add("office")
+        tags.add("formal")
+    if category in {"coat", "jacket", "boots"}:
+        tags.add("outerwear")
+        tags.add("street")
+    if category in {"tshirt", "top", "shirt", "shorts", "jeans", "skirt", "dress"}:
+        tags.add("casual")
+    if contains_any_keyword(text, {"outdoor", "trail", "hiking", "technical", "utility", "туризм"}) or category in {"boots"}:
+        tags.add("outdoor")
+    if contains_any_keyword(text, RAIN_KEYWORDS | WIND_KEYWORDS | SNOW_KEYWORDS):
+        tags.add("weather")
+
+    return sorted(tags)
+
+
 def is_valid_catalog_item(item: Dict[str, Any]) -> bool:
     title = re.sub(r"\s+", " ", str(item.get("title") or "").strip())
     url = str(item.get("url") or "").strip()
@@ -417,6 +639,62 @@ def is_valid_catalog_item(item: Dict[str, Any]) -> bool:
     if price is None or price < 300 or price > 500000:
         return False
     return True
+
+
+def derive_catalog_metadata(
+    *,
+    title: Any,
+    category: Any,
+    style: Any = None,
+    gender: Any = None,
+    source: Any = None,
+    extra_context: Any = None,
+) -> Dict[str, Any]:
+    normalized_category = str(category or "").strip().lower()
+    normalized_style = infer_style(style, extra_context, title, default=(style or None))
+    normalized_gender = infer_gender(gender, extra_context, title, default=(gender or None))
+
+    context = " ".join(
+        part for part in [
+            str(title or "").strip(),
+            normalized_category,
+            str(style or "").strip(),
+            str(gender or "").strip(),
+            str(source or "").strip(),
+            str(extra_context or "").strip(),
+        ] if part
+    )
+
+    warmth = infer_warmth(context, category=normalized_category)
+    flags = infer_weather_flags(
+        context,
+        category=normalized_category,
+        style=normalized_style,
+    )
+
+    return {
+        "gender": normalized_gender,
+        "style": normalized_style,
+        "warmth": warmth,
+        "water_resistant": flags["rain"],
+        "weather_rain": flags["rain"],
+        "weather_wind": flags["wind"],
+        "weather_snow": flags["snow"],
+        "weather_heat": flags["heat"],
+        "weather_tags": ",".join(
+            infer_weather_tags(flags, warmth, category=normalized_category)
+        ),
+        "weather_profiles": ",".join(
+            infer_weather_profiles(flags, category=normalized_category)
+        ),
+        "purpose_tags": ",".join(
+            infer_purpose_tags(
+                context,
+                category=normalized_category,
+                style=normalized_style,
+            )
+        ),
+    }
 
 
 def finalize_product(
@@ -445,6 +723,16 @@ def finalize_product(
         "gender": infer_gender(category_hint, item.get("gender"), title, default=default_gender),
         "style": infer_style(category_hint, item.get("style"), title, default=default_style),
     }
+    normalized.update(
+        derive_catalog_metadata(
+            title=title,
+            category=normalized["category"],
+            style=normalized["style"],
+            gender=normalized["gender"],
+            source=normalized["source"],
+            extra_context=category_hint,
+        )
+    )
 
     if not is_valid_catalog_item(normalized):
         return None
