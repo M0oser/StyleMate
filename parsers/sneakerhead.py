@@ -3,7 +3,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 
-from .utils import extract_price_from_text
+from .utils import extract_price_from_text, finalize_product
 
 
 BASE_URL = "https://sneakerhead.ru"
@@ -12,21 +12,6 @@ CATALOG_URL = "https://sneakerhead.ru/men"
 HEADERS = {
     "User-Agent": "Mozilla/5.0",
     "Accept-Language": "ru-RU,ru;q=0.9",
-}
-
-ALLOWED_CATEGORIES = {
-    "tshirt",
-    "shirt",
-    "hoodie",
-    "sweater",
-    "jeans",
-    "trousers",
-    "shorts",
-    "jacket",
-    "coat",
-    "sneakers",
-    "boots",
-    "shoes",
 }
 
 HARD_BLOCKED_WORDS = {
@@ -62,40 +47,6 @@ HARD_BLOCKED_WORDS = {
 def is_hard_blocked(title: str) -> bool:
     t = (title or "").lower()
     return any(word in t for word in HARD_BLOCKED_WORDS)
-
-
-def detect_category(text: str) -> str:
-    t = (text or "").lower()
-
-    if "футбол" in t or "t-shirt" in t or "tee" in t:
-        return "tshirt"
-    if "рубаш" in t or "shirt" in t or "polo" in t:
-        return "shirt"
-    if "худи" in t or "hoodie" in t:
-        return "hoodie"
-    if "свитер" in t or "свитшот" in t or "jumper" in t or "sweatshirt" in t:
-        return "sweater"
-
-    if "шорт" in t:
-        return "shorts"
-    if "джинс" in t or "jeans" in t:
-        return "jeans"
-    if "брюк" in t or "брюки" in t or "pants" in t or "trouser" in t:
-        return "trousers"
-
-    if "жилет" in t or "куртк" in t or "jacket" in t:
-        return "jacket"
-    if "пальто" in t or "пуховик" in t or "coat" in t:
-        return "coat"
-
-    if "кроссов" in t or "кед" in t or " sneaker " in f" {t} ":
-        return "sneakers"
-    if "ботин" in t or "boot" in t:
-        return "boots"
-    if "туфл" in t or "shoe" in t or "loafer" in t:
-        return "shoes"
-
-    return "other"
 
 
 def extract_price_from_card(card):
@@ -202,17 +153,12 @@ def normalize_product(card):
     if is_hard_blocked(title):
         return None
 
-    category = detect_category(title)
-    if category not in ALLOWED_CATEGORIES:
-        return None
-
     price = extract_price_from_card(card)
     if price is None:
         return None
 
-    return {
+    return finalize_product({
         "title": title,
-        "category": category,
         "color": None,
         "price": price,
         "currency": "RUB",
@@ -220,7 +166,8 @@ def normalize_product(card):
         "image_url": extract_image(card),
         "source": "sneakerhead",
         "external_id": href.strip("/"),
-    }
+        "style": "sport",
+    }, default_gender="male", default_style="sport", category_hint="men sport")
 
 
 def get_sneakerhead_products(max_pages=30):

@@ -4,5 +4,7 @@ pydantic-settings
 aiogram>=3.0.0
 python-dotenv
 pillow
+requests
+beautifulsoup4
 torch
 open-clip-torch

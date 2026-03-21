@@ -3,12 +3,15 @@ from database.db import count_catalog_items, get_catalog_items, list_catalog_sou
 
 ALLOWED_CATEGORIES = {
     "tshirt",
+    "top",
     "shirt",
     "hoodie",
     "sweater",
     "jeans",
     "trousers",
     "shorts",
+    "skirt",
+    "dress",
     "jacket",
     "coat",
     "sneakers",

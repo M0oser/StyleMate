@@ -2,7 +2,7 @@ from urllib.parse import urljoin
 
 import requests
 
-from .utils import normalize_price
+from .utils import build_retry_session, finalize_product, normalize_price
 
 
 BASE_URL = "https://limestore.com"
@@ -26,84 +26,6 @@ HEADERS = {
     "Origin": "https://limestore.com",
     "Accept-Language": "ru-RU,ru;q=0.9,en;q=0.8",
 }
-
-ALLOWED_CATEGORIES = {
-    "tshirt",
-    "shirt",
-    "hoodie",
-    "sweater",
-    "jeans",
-    "trousers",
-    "shorts",
-    "jacket",
-    "coat",
-    "sneakers",
-    "boots",
-    "shoes",
-}
-
-BLOCKED_WORDS = {
-    "boxer",
-    "boxers",
-    "боксер",
-    "боксеров",
-    "белье",
-    "трусы",
-    "briefs",
-    "panties",
-    "underwear",
-    "носки",
-    "socks",
-    "ремень",
-    "belt",
-    "сумка",
-    "bag",
-    "парфюм",
-    "perfume",
-    "wallet",
-    "кошелек",
-    "шапка",
-    "hat",
-    "cap",
-}
-
-
-def detect_category(text: str) -> str:
-    n = (text or "").lower()
-
-    if any(word in n for word in BLOCKED_WORDS):
-        return "other"
-
-    if "джинс" in n or "jeans" in n:
-        return "jeans"
-    if "брюк" in n or "брюки" in n or "trouser" in n or "pants" in n:
-        return "trousers"
-    if "шорт" in n or "short" in n:
-        return "shorts"
-
-    if "кроссов" in n or "sneaker" in n:
-        return "sneakers"
-    if "ботин" in n or "boot" in n:
-        return "boots"
-    if "туфл" in n or "лофер" in n or "shoe" in n or "loafer" in n:
-        return "shoes"
-
-    if "футбол" in n or "майка" in n or "t-shirt" in n or "t shirt" in n or "tee" in n:
-        return "tshirt"
-    if "рубаш" in n or "shirt" in n or "polo" in n:
-        return "shirt"
-    if "худи" in n or "hoodie" in n:
-        return "hoodie"
-    if "свитер" in n or "кардиган" in n or "джемпер" in n or "knit" in n or "jumper" in n:
-        return "sweater"
-
-    if "пиджак" in n or "блейзер" in n or "жакет" in n or "jacket" in n or "blazer" in n:
-        return "jacket"
-    if "пальто" in n or "пуховик" in n or "плащ" in n or "coat" in n or "trench" in n:
-        return "coat"
-
-    return "other"
-
 
 def normalize_color_name(color_name):
     if not color_name:
@@ -271,10 +193,6 @@ def normalize_product(raw):
     if not title:
         return None
 
-    category = detect_category(title)
-    if category not in ALLOWED_CATEGORIES:
-        return None
-
     first_model = extract_model(entity)
     color = extract_color(entity, first_model)
     image_url = extract_image_url(entity, first_model)
@@ -286,9 +204,8 @@ def normalize_product(raw):
     if not external_id:
         return None
 
-    return {
+    return finalize_product({
         "title": title,
-        "category": category,
         "color": color,
         "price": price,
         "currency": "RUB",
@@ -296,10 +213,10 @@ def normalize_product(raw):
         "image_url": image_url,
         "source": "lime",
         "external_id": str(external_id),
-    }
+    }, default_gender="male", default_style="casual", category_hint="men")
 
 
-def fetch_page(session: requests.Session, section_slug: str, page: int, page_size: int = 100):
+def fetch_page(session: requests.Session, section_slug: str, page: int, page_size: int = 60):
     params = {
         "page": page,
         "page_size": page_size,
@@ -309,7 +226,7 @@ def fetch_page(session: requests.Session, section_slug: str, page: int, page_siz
     headers = dict(HEADERS)
     headers["Referer"] = f"https://limestore.com/ru_ru/catalog/{section_slug}"
 
-    response = session.get(url, headers=headers, params=params, timeout=30)
+    response = session.get(url, headers=headers, params=params, timeout=75)
     response.raise_for_status()
     return response.json()
 
@@ -320,7 +237,7 @@ def get_section_products(session: requests.Session, section_slug: str):
     seen = set()
 
     while True:
-        payload = fetch_page(session=session, section_slug=section_slug, page=page, page_size=100)
+        payload = fetch_page(session=session, section_slug=section_slug, page=page, page_size=60)
         raw_items = extract_items(payload)
 
         if not raw_items:
@@ -340,7 +257,7 @@ def get_section_products(session: requests.Session, section_slug: str):
             result.append(item)
             added_this_page += 1
 
-        if len(raw_items) < 100:
+        if len(raw_items) < 60:
             break
 
         if added_this_page == 0:
@@ -357,7 +274,7 @@ def get_section_products(session: requests.Session, section_slug: str):
 def get_lime_products():
     result = []
     seen = set()
-    with requests.Session() as session:
+    with build_retry_session() as session:
         for slug in SECTION_SLUGS:
             try:
                 section_items = get_section_products(session=session, section_slug=slug)

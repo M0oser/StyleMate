@@ -1,294 +1,309 @@
+import json
 import re
-import time
-from urllib.parse import quote_plus, urljoin
+from typing import Optional
+from urllib.parse import urljoin
 
 import requests
 
-from .utils import normalize_price
+from .utils import build_retry_session, finalize_product, normalize_price
 
 
-URL = "https://www.zara.com/nl/en/category/2443335/products?ajax=true"
-
+BASE_SITE = "https://www.zara.com"
 HEADERS = {
-    "Referer": "https://www.zara.com/nl/en/man-all-products-l7465.html?v1=2443335",
-    "Accept": "*/*",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,ru;q=0.8",
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
 }
 
-BASE_SITE = "https://www.zara.com"
-LOCALE_PATH = "nl/en"
+SECTION_CONFIGS = [
+    {
+        "url": "https://www.zara.com/tr/en/man-all-products-l7465.html",
+        "gender": "male",
+        "style": "casual",
+        "category_hint": "men all products",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/man-tracksuits-l17522.html",
+        "gender": "male",
+        "style": "sport",
+        "category_hint": "men sport tracksuits",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/zara-athleticz-l4651.html?v1=2436591",
+        "gender": "male",
+        "style": "sport",
+        "category_hint": "men sport athleticz",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/woman-jackets-l1114.html",
+        "gender": "female",
+        "style": "casual",
+        "category_hint": "women jackets",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/woman-tshirts-l1362.html",
+        "gender": "female",
+        "style": "casual",
+        "category_hint": "women tshirts",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/woman-shirts-l1217.html",
+        "gender": "female",
+        "style": "casual",
+        "category_hint": "women shirts blouses",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/woman-trousers-l1335.html",
+        "gender": "female",
+        "style": "casual",
+        "category_hint": "women trousers",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/woman-dresses-l1066.html",
+        "gender": "female",
+        "style": "casual",
+        "category_hint": "women dresses",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/woman-sweatshirts-l1320.html",
+        "gender": "female",
+        "style": "casual",
+        "category_hint": "women sweatshirts hoodies",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/woman-cardigans-sweaters-l8322.html",
+        "gender": "female",
+        "style": "casual",
+        "category_hint": "women cardigans sweaters",
+    },
+    {
+        "url": "https://www.zara.com/tr/en/woman-tops-l1322.html",
+        "gender": "female",
+        "style": "casual",
+        "category_hint": "women tops",
+    },
+]
 
-ALLOWED_CATEGORIES = {
-    "tshirt",
-    "shirt",
-    "hoodie",
-    "sweater",
-    "jeans",
-    "trousers",
-    "shorts",
-    "jacket",
-    "coat",
-    "sneakers",
-    "boots",
-    "shoes",
-}
+INTERSTITIAL_TOKEN_RE = re.compile(r'"bm-verify":\s*"([^"]+)"')
+INTERSTITIAL_POW_RE = re.compile(
+    r"var i = (\d+);\s*var j = i \+ Number\(\"(\d+)\" \+ \"(\d+)\"\);"
+)
 
 
-def slugify_title(title):
-    s = (title or "").lower().strip()
-    s = s.replace("&", " and ")
-    s = re.sub(r"['’]", "", s)
-    s = re.sub(r"[^a-z0-9]+", "-", s)
-    s = re.sub(r"-+", "-", s).strip("-")
-    return s
+def slugify_title(title: str) -> str:
+    value = (title or "").lower().strip()
+    value = value.replace("&", " and ")
+    value = re.sub(r"['’]", "", value)
+    value = re.sub(r"[^a-z0-9]+", "-", value)
+    return re.sub(r"-+", "-", value).strip("-")
 
 
-def extract_article_from_reference(reference):
-    if not reference:
-        return None
-    return reference.split("-")[0].strip() or None
+def solve_interstitial(session: requests.Session, url: str, html: str) -> str:
+    token_match = INTERSTITIAL_TOKEN_RE.search(html)
+    pow_match = INTERSTITIAL_POW_RE.search(html)
+    if not token_match or not pow_match:
+        return html
 
-
-def build_zara_url(title, reference):
-    article = extract_article_from_reference(reference)
-    slug = slugify_title(title)
-
-    if article and slug:
-        return "{}/{}/{}-p{}.html".format(BASE_SITE, LOCALE_PATH, slug, article)
-
-    query = quote_plus("site:zara.com {}".format(title))
-    return "https://www.google.com/search?q={}".format(query)
-
-
-def detect_category(name):
-    n = (name or "").lower()
-
-    blocked_words = {
-        "perfume", "fragrance", "parfum", "candle",
-        "bag", "wallet", "belt", "cap", "hat",
-        "glasses", "sunglasses", "watch", "ring",
-        "necklace", "bracelet", "earring",
-        "laptop", "phone", "tablet", "computer",
+    base_value = int(pow_match.group(1))
+    pow_value = base_value + int(pow_match.group(2) + pow_match.group(3))
+    payload = {
+        "bm-verify": token_match.group(1),
+        "pow": pow_value,
     }
 
-    if any(word in n for word in blocked_words):
-        return "other"
+    verify_headers = dict(HEADERS)
+    verify_headers["Content-Type"] = "application/json"
+    verify_headers["Referer"] = url
 
-    if "jeans" in n:
-        return "jeans"
-    if "trouser" in n or "trousers" in n or "pants" in n:
-        return "trousers"
-    if "shorts" in n:
-        return "shorts"
-    if "sneaker" in n:
-        return "sneakers"
-    if "boot" in n:
-        return "boots"
-    if "shoe" in n or "loafer" in n:
-        return "shoes"
+    response = session.post(
+        f"{BASE_SITE}/_sec/verify?provider=interstitial",
+        headers=verify_headers,
+        json=payload,
+        timeout=75,
+    )
+    response.raise_for_status()
 
-    if "t-shirt" in n or "t shirt" in n or "tee" in n:
-        return "tshirt"
-    if "shirt" in n or "polo" in n:
-        return "shirt"
-    if "hoodie" in n:
-        return "hoodie"
-    if "jacket" in n or "blazer" in n or "gilet" in n or "vest" in n or "waistcoat" in n:
-        return "jacket"
-    if "coat" in n or "trench" in n or "puffer" in n:
-        return "coat"
-    if "sweater" in n or "jumper" in n or "knit" in n:
-        return "sweater"
-
-    return "other"
+    data = response.json()
+    next_url = urljoin(BASE_SITE, data.get("location") or url)
+    retry_response = session.get(next_url, headers=HEADERS, timeout=75)
+    retry_response.raise_for_status()
+    return retry_response.text
 
 
-def normalize_color_name(color_name):
-    if not color_name:
+def extract_assigned_json(text: str, name: str):
+    marker = f"{name} = "
+    start = text.find(marker)
+    if start == -1:
         return None
 
-    c = color_name.lower().strip()
+    index = start + len(marker)
+    if index >= len(text) or text[index] != "{":
+        return None
 
-    mapping = {
-        "black": "black",
-        "white": "white",
-        "blue": "blue",
-        "navy": "navy",
-        "grey": "gray",
-        "gray": "gray",
-        "charcoal": "gray",
-        "beige": "beige",
-        "brown": "brown",
-        "chocolate": "brown",
-        "red": "red",
-        "green": "green",
-        "pink": "pink",
-        "khaki": "green",
-        "ecru": "beige",
-        "camel": "brown",
-    }
+    depth = 0
+    in_string = False
+    escaped = False
 
-    return mapping.get(c, c)
-
-
-def extract_color_from_title(title):
-    colors = [
-        "black", "white", "blue", "navy", "gray", "grey",
-        "beige", "brown", "red", "green", "pink",
-        "charcoal", "chocolate", "khaki", "camel", "ecru"
-    ]
-    n = (title or "").lower()
-
-    for c in colors:
-        if c in n:
-            return normalize_color_name(c)
+    for position in range(index, len(text)):
+        char = text[position]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+        else:
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return json.loads(text[index:position + 1])
 
     return None
 
 
-def extract_color_from_product(product):
-    detail = product.get("detail", {})
-    colors = detail.get("colors", [])
-
-    if colors and isinstance(colors, list):
-        first_color = colors[0]
-        color_name = first_color.get("name")
-        if color_name:
-            return normalize_color_name(color_name)
-
-    return extract_color_from_title(product.get("name"))
+def extract_payload(html: str):
+    return extract_assigned_json(html, "window.zara.viewPayload")
 
 
-def find_products(payload):
-    products = []
-    for group in payload.get("productGroups", []):
-        for element in group.get("elements", []):
-            products.append(element)
-    return products
+def extract_image_url(component: dict) -> Optional[str]:
+    detail = component.get("detail") or {}
+    colors = detail.get("colors") or []
 
-
-def walk_products(obj, found):
-    if isinstance(obj, dict):
-        if obj.get("type") == "Product" and obj.get("name") and obj.get("reference"):
-            found.append(obj)
-            return
-
-        for value in obj.values():
-            walk_products(value, found)
-
-    elif isinstance(obj, list):
-        for item in obj:
-            walk_products(item, found)
-
-
-def extract_real_product_nodes(elements):
-    real_products = []
-    seen = set()
-
-    for el in elements:
-        temp = []
-        walk_products(el, temp)
-
-        for product in temp:
-            ref = product.get("reference")
-            if not ref or ref in seen:
-                continue
-            seen.add(ref)
-            real_products.append(product)
-
-    return real_products
-
-
-def extract_image_url(product):
-    detail = product.get("detail", {})
-    colors = detail.get("colors", [])
-
-    if colors and isinstance(colors, list):
-        first_color = colors[0]
-        media = first_color.get("xmedia", [])
-        if media and isinstance(media, list):
-            first_media = media[0]
-            if isinstance(first_media, dict):
-                return first_media.get("url") or first_media.get("path")
-
-    media = product.get("xmedia", [])
-    if media and isinstance(media, list):
-        first_media = media[0]
-        if isinstance(first_media, dict):
-            return first_media.get("url") or first_media.get("path")
+    for color in colors:
+        for media in color.get("xmedia") or []:
+            url = media.get("url")
+            if url and "transparent-background" not in url and "loader.gif" not in url:
+                return url.replace("{width}", "563")
 
     return None
 
 
-def extract_price(product):
-    candidates = [product.get("price"), product.get("oldPrice")]
+def extract_price(component: dict):
+    detail = component.get("detail") or {}
+    colors = detail.get("colors") or []
 
-    detail = product.get("detail", {})
-    colors = detail.get("colors", [])
-    if colors and isinstance(colors, list):
-        first_color = colors[0]
-        if isinstance(first_color, dict):
-            candidates.extend([first_color.get("price"), first_color.get("oldPrice")])
-
-    for candidate in candidates:
-        if isinstance(candidate, int):
-            return candidate / 100.0
-
-        price = normalize_price(candidate)
+    for color in colors:
+        price = color.get("price")
         if price is not None:
-            return price
+            return float(price) / 100.0
+
+    price = component.get("price")
+    if price is not None:
+        return float(price) / 100.0
 
     return None
 
 
-def normalize_product(product):
-    title = product.get("name")
-    reference = product.get("reference")
-
+def build_product_url(title: str, reference: str) -> Optional[str]:
     if not title or not reference:
         return None
 
-    category = detect_category(title)
-    if category not in ALLOWED_CATEGORIES:
+    article = reference.split("-")[0].strip()
+    if not article:
         return None
 
-    image_url = extract_image_url(product)
-    if image_url:
-        image_url = urljoin(BASE_SITE, image_url)
+    slug = slugify_title(title)
+    if not slug:
+        return None
 
-    color = extract_color_from_product(product)
-    price = extract_price(product)
-    url = build_zara_url(title, reference)
+    return f"{BASE_SITE}/tr/en/{slug}-p{article}.html"
 
-    return {
-        "title": title,
-        "category": category,
-        "color": color,
-        "price": price,
-        "currency": "EUR",
-        "url": url,
-        "image_url": image_url,
-        "source": "zara",
-        "external_id": reference,
-    }
+
+def iter_components(payload: dict):
+    for group in payload.get("productGroups") or []:
+        for element in group.get("elements") or []:
+            for component in element.get("commercialComponents") or []:
+                if component.get("type") == "Product" and component.get("name"):
+                    yield component
+
+
+def normalize_component(component: dict, config: dict):
+    title = component.get("name")
+    reference = component.get("reference")
+    url = build_product_url(title, reference)
+    if not url:
+        return None
+
+    return finalize_product(
+        {
+            "title": title,
+            "price": extract_price(component),
+            "currency": "TRY",
+            "url": url,
+            "image_url": extract_image_url(component),
+            "source": "zara",
+            "external_id": reference.split("-")[0].strip() if reference else None,
+            "style": config["style"],
+        },
+        default_gender=config["gender"],
+        default_style=config["style"],
+        category_hint=config["category_hint"],
+    )
+
+
+def get_section_products(session: requests.Session, config: dict):
+    response = session.get(config["url"], headers=HEADERS, timeout=75)
+    response.raise_for_status()
+
+    html = response.text
+    if "/_sec/verify?provider=interstitial" in html:
+        html = solve_interstitial(session, config["url"], html)
+
+    payload = extract_payload(html)
+    if not payload:
+        print(f'zara section payload missing {config["category_hint"]}')
+        return []
+
+    result = []
+    seen = set()
+
+    for component in iter_components(payload):
+        item = normalize_component(component, config)
+        if not item or item["url"] in seen:
+            continue
+        seen.add(item["url"])
+        result.append(item)
+
+    print(f'zara section {config["category_hint"]}: found {len(result)}')
+    return result
+
+
+def _collect_zara_products(gender: Optional[str] = None):
+    result = []
+    seen = set()
+
+    with build_retry_session(total_retries=3, backoff_factor=1.0) as session:
+        for config in SECTION_CONFIGS:
+            if gender and config["gender"] != gender:
+                continue
+
+            try:
+                section_items = get_section_products(session, config)
+            except Exception as e:
+                print(f'zara section error {config["category_hint"]}:', e)
+                continue
+
+            for item in section_items:
+                if item["url"] in seen:
+                    continue
+                seen.add(item["url"])
+                result.append(item)
+
+    return result
 
 
 def get_zara_products():
-    with requests.Session() as session:
-        session.get("https://www.zara.com", headers=HEADERS, timeout=30)
-        time.sleep(2)
+    return _collect_zara_products()
 
-        response = session.get(URL, headers=HEADERS, timeout=30)
-        response.raise_for_status()
 
-        data = response.json()
-        elements = find_products(data)
-        products = extract_real_product_nodes(elements)
+def get_zara_men_products():
+    return _collect_zara_products(gender="male")
 
-        result = []
-        for product in products:
-            item = normalize_product(product)
-            if item:
-                result.append(item)
 
-        return result
+def get_zara_women_products():
+    return _collect_zara_products(gender="female")

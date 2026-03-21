@@ -31,14 +31,17 @@ def normalize_category(category: Optional[str]) -> str:
         "t-shirt": "tshirt",
         "tee": "tshirt",
         "top": "tshirt",
+        "tank top": "top",
         "pants": "trousers",
         "trouser": "trousers",
+        "leggings": "trousers",
         "sneaker": "sneakers",
         "boot": "boots",
         "shoe": "shoes",
         "jean": "jeans",
         "blouse": "shirt",
         "sweatshirt": "sweater",
+        "cardigan": "sweater",
     }
 
     return mapping.get(c, c)
