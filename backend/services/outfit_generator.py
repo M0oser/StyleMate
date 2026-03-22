@@ -17,6 +17,23 @@ class WardrobeItem:
     color: Optional[str]
     source: str
     style: Optional[str] = None
+    gender: Optional[str] = None
+    warmth: Optional[str] = None
+    weather_tags: Optional[str] = None
+    weather_profiles: Optional[str] = None
+    purpose_tags: Optional[str] = None
+    subcategory: Optional[str] = None
+    material_tags: Optional[str] = None
+    fit_tags: Optional[str] = None
+    feature_tags: Optional[str] = None
+    usecase_tags: Optional[str] = None
+    hooded: bool = False
+    waterproof: bool = False
+    windproof: bool = False
+    insulated: bool = False
+    technical: bool = False
+    many_pockets: bool = False
+    pocket_level: Optional[str] = None
     vision_source: Optional[str] = None
     manually_edited: bool = False
     vision_payload_path: Optional[str] = None
@@ -166,6 +183,7 @@ def load_user_wardrobe(
                 color=normalize_color(color),
                 source="user",
                 style=normalize_style(style),
+                gender="unisex",
                 vision_source=(vision_source or "").strip() or None,
                 manually_edited=bool(manually_edited),
                 vision_payload_path=(vision_payload_path or "").strip() or None,
@@ -201,10 +219,38 @@ def load_shop_wardrobe(db_path: str = "database/wardrobe.db", limit: int = 300) 
     table_columns = get_shop_catalog_columns(db_path=db_path) if table_name == "shop_catalog" else set()
     source_expr = "source" if "source" in table_columns else "'shop'"
     currency_expr = "currency" if "currency" in table_columns else "'RUB'"
+    gender_expr = "gender" if "gender" in table_columns else "'unisex'"
+    style_expr = "style" if "style" in table_columns else "'casual'"
+    warmth_expr = "warmth" if "warmth" in table_columns else "NULL"
+    weather_tags_expr = "weather_tags" if "weather_tags" in table_columns else "NULL"
+    weather_profiles_expr = "weather_profiles" if "weather_profiles" in table_columns else "NULL"
+    purpose_tags_expr = "purpose_tags" if "purpose_tags" in table_columns else "NULL"
+    subcategory_expr = "subcategory" if "subcategory" in table_columns else "NULL"
+    material_tags_expr = "material_tags" if "material_tags" in table_columns else "NULL"
+    fit_tags_expr = "fit_tags" if "fit_tags" in table_columns else "NULL"
+    feature_tags_expr = "feature_tags" if "feature_tags" in table_columns else "NULL"
+    usecase_tags_expr = "usecase_tags" if "usecase_tags" in table_columns else "NULL"
+    hooded_expr = "hooded" if "hooded" in table_columns else "0"
+    waterproof_expr = "waterproof" if "waterproof" in table_columns else "0"
+    windproof_expr = "windproof" if "windproof" in table_columns else "0"
+    insulated_expr = "insulated" if "insulated" in table_columns else "0"
+    technical_expr = "technical" if "technical" in table_columns else "0"
+    many_pockets_expr = "many_pockets" if "many_pockets" in table_columns else "0"
+    pocket_level_expr = "pocket_level" if "pocket_level" in table_columns else "'low'"
 
     try:
         cur.execute(f"""
-            SELECT id, title, price, {currency_expr} as currency, url, image_url, category, color, {source_expr} as source
+            SELECT
+                id, title, price, {currency_expr} as currency, url, image_url, category, color,
+                {source_expr} as source, {gender_expr} as gender, {style_expr} as style,
+                {warmth_expr} as warmth, {weather_tags_expr} as weather_tags,
+                {weather_profiles_expr} as weather_profiles, {purpose_tags_expr} as purpose_tags,
+                {subcategory_expr} as subcategory, {material_tags_expr} as material_tags,
+                {fit_tags_expr} as fit_tags, {feature_tags_expr} as feature_tags,
+                {usecase_tags_expr} as usecase_tags, {hooded_expr} as hooded,
+                {waterproof_expr} as waterproof, {windproof_expr} as windproof,
+                {insulated_expr} as insulated, {technical_expr} as technical,
+                {many_pockets_expr} as many_pockets, {pocket_level_expr} as pocket_level
             FROM {table_name}
             WHERE category IS NOT NULL
             ORDER BY id DESC
@@ -215,7 +261,12 @@ def load_shop_wardrobe(db_path: str = "database/wardrobe.db", limit: int = 300) 
         con.close()
 
     items: List[WardrobeItem] = []
-    for pid, title, price, currency, url, image_url, category, color, source in rows:
+    for (
+        pid, title, price, currency, url, image_url, category, color, source, gender, style,
+        warmth, weather_tags, weather_profiles, purpose_tags, subcategory, material_tags,
+        fit_tags, feature_tags, usecase_tags, hooded, waterproof, windproof, insulated,
+        technical, many_pockets, pocket_level,
+    ) in rows:
         cat = normalize_category(category)
 
         if cat in {"unknown", "accessory"}:
@@ -232,6 +283,24 @@ def load_shop_wardrobe(db_path: str = "database/wardrobe.db", limit: int = 300) 
                 cat=cat,
                 color=normalize_color(color),
                 source=(source or "").strip().lower() or "shop",
+                style=normalize_style(style),
+                gender=(gender or "unisex").strip().lower() if isinstance(gender, str) else "unisex",
+                warmth=(warmth or "").strip().lower() if isinstance(warmth, str) else None,
+                weather_tags=(weather_tags or "").strip() if isinstance(weather_tags, str) else None,
+                weather_profiles=(weather_profiles or "").strip() if isinstance(weather_profiles, str) else None,
+                purpose_tags=(purpose_tags or "").strip() if isinstance(purpose_tags, str) else None,
+                subcategory=(subcategory or "").strip() if isinstance(subcategory, str) else None,
+                material_tags=(material_tags or "").strip() if isinstance(material_tags, str) else None,
+                fit_tags=(fit_tags or "").strip() if isinstance(fit_tags, str) else None,
+                feature_tags=(feature_tags or "").strip() if isinstance(feature_tags, str) else None,
+                usecase_tags=(usecase_tags or "").strip() if isinstance(usecase_tags, str) else None,
+                hooded=bool(hooded),
+                waterproof=bool(waterproof),
+                windproof=bool(windproof),
+                insulated=bool(insulated),
+                technical=bool(technical),
+                many_pockets=bool(many_pockets),
+                pocket_level=(pocket_level or "").strip().lower() if isinstance(pocket_level, str) else None,
             )
         )
 

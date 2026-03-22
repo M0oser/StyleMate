@@ -28,6 +28,18 @@ def ensure_shop_catalog_schema(db_path=DB_PATH):
         "weather_heat": "ALTER TABLE shop_catalog ADD COLUMN weather_heat INTEGER DEFAULT 0",
         "weather_profiles": "ALTER TABLE shop_catalog ADD COLUMN weather_profiles TEXT DEFAULT ''",
         "purpose_tags": "ALTER TABLE shop_catalog ADD COLUMN purpose_tags TEXT DEFAULT ''",
+        "subcategory": "ALTER TABLE shop_catalog ADD COLUMN subcategory TEXT DEFAULT ''",
+        "material_tags": "ALTER TABLE shop_catalog ADD COLUMN material_tags TEXT DEFAULT ''",
+        "fit_tags": "ALTER TABLE shop_catalog ADD COLUMN fit_tags TEXT DEFAULT ''",
+        "feature_tags": "ALTER TABLE shop_catalog ADD COLUMN feature_tags TEXT DEFAULT ''",
+        "usecase_tags": "ALTER TABLE shop_catalog ADD COLUMN usecase_tags TEXT DEFAULT ''",
+        "hooded": "ALTER TABLE shop_catalog ADD COLUMN hooded INTEGER DEFAULT 0",
+        "waterproof": "ALTER TABLE shop_catalog ADD COLUMN waterproof INTEGER DEFAULT 0",
+        "windproof": "ALTER TABLE shop_catalog ADD COLUMN windproof INTEGER DEFAULT 0",
+        "insulated": "ALTER TABLE shop_catalog ADD COLUMN insulated INTEGER DEFAULT 0",
+        "technical": "ALTER TABLE shop_catalog ADD COLUMN technical INTEGER DEFAULT 0",
+        "many_pockets": "ALTER TABLE shop_catalog ADD COLUMN many_pockets INTEGER DEFAULT 0",
+        "pocket_level": "ALTER TABLE shop_catalog ADD COLUMN pocket_level TEXT DEFAULT 'low'",
     }
 
     for column, sql in migrations.items():
@@ -81,7 +93,19 @@ def init_db():
         weather_snow INTEGER DEFAULT 0,
         weather_heat INTEGER DEFAULT 0,
         weather_profiles TEXT DEFAULT '',
-        purpose_tags TEXT DEFAULT ''
+        purpose_tags TEXT DEFAULT '',
+        subcategory TEXT DEFAULT '',
+        material_tags TEXT DEFAULT '',
+        fit_tags TEXT DEFAULT '',
+        feature_tags TEXT DEFAULT '',
+        usecase_tags TEXT DEFAULT '',
+        hooded INTEGER DEFAULT 0,
+        waterproof INTEGER DEFAULT 0,
+        windproof INTEGER DEFAULT 0,
+        insulated INTEGER DEFAULT 0,
+        technical INTEGER DEFAULT 0,
+        many_pockets INTEGER DEFAULT 0,
+        pocket_level TEXT DEFAULT 'low'
     )
     """)
 
@@ -98,8 +122,8 @@ def save_to_shop_catalog(item_dict, db_path=DB_PATH):
 
     cur.execute("""
     INSERT OR IGNORE INTO shop_catalog
-    (title, category, color, price, url, image_url, currency, source, external_id, gender, style, warmth, water_resistant, weather_tags, weather_rain, weather_wind, weather_snow, weather_heat, weather_profiles, purpose_tags)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (title, category, color, price, url, image_url, currency, source, external_id, gender, style, warmth, water_resistant, weather_tags, weather_rain, weather_wind, weather_snow, weather_heat, weather_profiles, purpose_tags, subcategory, material_tags, fit_tags, feature_tags, usecase_tags, hooded, waterproof, windproof, insulated, technical, many_pockets, pocket_level)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         item_dict.get("title"),
         item_dict.get("category"),
@@ -121,13 +145,25 @@ def save_to_shop_catalog(item_dict, db_path=DB_PATH):
         int(bool(item_dict.get("weather_heat", False))),
         item_dict.get("weather_profiles", ""),
         item_dict.get("purpose_tags", ""),
+        item_dict.get("subcategory", ""),
+        item_dict.get("material_tags", ""),
+        item_dict.get("fit_tags", ""),
+        item_dict.get("feature_tags", ""),
+        item_dict.get("usecase_tags", ""),
+        int(bool(item_dict.get("hooded", False))),
+        int(bool(item_dict.get("waterproof", False))),
+        int(bool(item_dict.get("windproof", False))),
+        int(bool(item_dict.get("insulated", False))),
+        int(bool(item_dict.get("technical", False))),
+        int(bool(item_dict.get("many_pockets", False))),
+        item_dict.get("pocket_level", "low"),
     ))
 
     conn.commit()
     conn.close()
 
 
-def _build_catalog_where(category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None):
+def _build_catalog_where(category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None, usecase_tag=None, feature_tag=None, material_tag=None, subcategory=None, hooded=None, waterproof=None, windproof=None, insulated=None, technical=None, many_pockets=None, pocket_level=None):
     where = []
     params = []
 
@@ -170,21 +206,59 @@ def _build_catalog_where(category=None, source=None, query=None, gender=None, st
     if purpose_tag:
         where.append("LOWER(COALESCE(purpose_tags, '')) LIKE LOWER(?)")
         params.append(f"%{purpose_tag}%")
+    if usecase_tag:
+        where.append("LOWER(COALESCE(usecase_tags, '')) LIKE LOWER(?)")
+        params.append(f"%{usecase_tag}%")
+    if feature_tag:
+        where.append("LOWER(COALESCE(feature_tags, '')) LIKE LOWER(?)")
+        params.append(f"%{feature_tag}%")
+    if material_tag:
+        where.append("LOWER(COALESCE(material_tags, '')) LIKE LOWER(?)")
+        params.append(f"%{material_tag}%")
+    if subcategory:
+        where.append("LOWER(COALESCE(subcategory, '')) = LOWER(?)")
+        params.append(subcategory)
+    if hooded is not None:
+        where.append("COALESCE(hooded, 0) = ?")
+        params.append(int(bool(hooded)))
+    if waterproof is not None:
+        where.append("COALESCE(waterproof, 0) = ?")
+        params.append(int(bool(waterproof)))
+    if windproof is not None:
+        where.append("COALESCE(windproof, 0) = ?")
+        params.append(int(bool(windproof)))
+    if insulated is not None:
+        where.append("COALESCE(insulated, 0) = ?")
+        params.append(int(bool(insulated)))
+    if technical is not None:
+        where.append("COALESCE(technical, 0) = ?")
+        params.append(int(bool(technical)))
+    if many_pockets is not None:
+        where.append("COALESCE(many_pockets, 0) = ?")
+        params.append(int(bool(many_pockets)))
+    if pocket_level:
+        where.append("LOWER(COALESCE(pocket_level, 'low')) = LOWER(?)")
+        params.append(pocket_level)
     if query:
         where.append(
             "("
             "LOWER(title) LIKE LOWER(?) OR "
             "LOWER(COALESCE(color, '')) LIKE LOWER(?) OR "
-            "LOWER(COALESCE(category, '')) LIKE LOWER(?)"
+            "LOWER(COALESCE(category, '')) LIKE LOWER(?) OR "
+            "LOWER(COALESCE(subcategory, '')) LIKE LOWER(?) OR "
+            "LOWER(COALESCE(fit_tags, '')) LIKE LOWER(?) OR "
+            "LOWER(COALESCE(feature_tags, '')) LIKE LOWER(?) OR "
+            "LOWER(COALESCE(usecase_tags, '')) LIKE LOWER(?) OR "
+            "LOWER(COALESCE(material_tags, '')) LIKE LOWER(?)"
             ")"
         )
         like = f"%{query}%"
-        params.extend([like, like, like])
+        params.extend([like, like, like, like, like, like, like, like])
 
     return where, params
 
 
-def get_catalog_items(limit=None, offset=0, category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None, db_path=DB_PATH):
+def get_catalog_items(limit=None, offset=0, category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None, usecase_tag=None, feature_tag=None, material_tag=None, subcategory=None, hooded=None, waterproof=None, windproof=None, insulated=None, technical=None, many_pockets=None, pocket_level=None, db_path=DB_PATH):
     ensure_shop_catalog_schema(db_path)
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -205,10 +279,21 @@ def get_catalog_items(limit=None, offset=0, category=None, source=None, query=No
         weather_snow=weather_snow,
         weather_heat=weather_heat,
         purpose_tag=purpose_tag,
+        usecase_tag=usecase_tag,
+        feature_tag=feature_tag,
+        material_tag=material_tag,
+        subcategory=subcategory,
+        hooded=hooded,
+        waterproof=waterproof,
+        windproof=windproof,
+        insulated=insulated,
+        technical=technical,
+        many_pockets=many_pockets,
+        pocket_level=pocket_level,
     )
 
     sql = """
-    SELECT id, title, category, color, price, url, image_url, currency, source, external_id, gender, style, warmth, water_resistant, weather_tags, weather_rain, weather_wind, weather_snow, weather_heat, weather_profiles, purpose_tags
+    SELECT id, title, category, color, price, url, image_url, currency, source, external_id, gender, style, warmth, water_resistant, weather_tags, weather_rain, weather_wind, weather_snow, weather_heat, weather_profiles, purpose_tags, subcategory, material_tags, fit_tags, feature_tags, usecase_tags, hooded, waterproof, windproof, insulated, technical, many_pockets, pocket_level
     FROM shop_catalog
     """
     if where:
@@ -228,7 +313,7 @@ def get_catalog_items(limit=None, offset=0, category=None, source=None, query=No
     return rows
 
 
-def count_catalog_items(category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None, db_path=DB_PATH):
+def count_catalog_items(category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None, usecase_tag=None, feature_tag=None, material_tag=None, subcategory=None, hooded=None, waterproof=None, windproof=None, insulated=None, technical=None, many_pockets=None, pocket_level=None, db_path=DB_PATH):
     ensure_shop_catalog_schema(db_path)
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
@@ -247,6 +332,17 @@ def count_catalog_items(category=None, source=None, query=None, gender=None, sty
         weather_snow=weather_snow,
         weather_heat=weather_heat,
         purpose_tag=purpose_tag,
+        usecase_tag=usecase_tag,
+        feature_tag=feature_tag,
+        material_tag=material_tag,
+        subcategory=subcategory,
+        hooded=hooded,
+        waterproof=waterproof,
+        windproof=windproof,
+        insulated=insulated,
+        technical=technical,
+        many_pockets=many_pockets,
+        pocket_level=pocket_level,
     )
     sql = "SELECT COUNT(*) FROM shop_catalog"
     if where:

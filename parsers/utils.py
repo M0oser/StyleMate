@@ -5,6 +5,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from backend.services.catalog_attribute_service import derive_item_attributes
+
 PRICE_PATTERNS = [
     r"\d[\d\s\xa0\u202f.,]*\s*₽",
     r"₽\s*\d[\d\s\xa0\u202f.,]*",
@@ -730,6 +732,17 @@ def finalize_product(
             style=normalized["style"],
             gender=normalized["gender"],
             source=normalized["source"],
+            extra_context=category_hint,
+        )
+    )
+    normalized.update(
+        derive_item_attributes(
+            title=title,
+            category=normalized["category"],
+            style=normalized["style"],
+            source=normalized["source"],
+            weather_tags=normalized.get("weather_tags"),
+            purpose_tags=normalized.get("purpose_tags"),
             extra_context=category_hint,
         )
     )

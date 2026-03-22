@@ -246,6 +246,37 @@ def item_source(item: Dict) -> str:
     return str(item.get("source", "user")).lower().strip() or "user"
 
 
+def item_bool(item: Dict, key: str) -> bool:
+    value = item.get(key)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y"}
+    return False
+
+
+def item_tag_values(item: Dict, key: str) -> set[str]:
+    value = item.get(key)
+    if not value:
+        return set()
+    if isinstance(value, str):
+        return {part.strip().lower() for part in value.split(",") if part.strip()}
+    if isinstance(value, (list, tuple, set)):
+        return {str(part).strip().lower() for part in value if str(part).strip()}
+    return set()
+
+
+def item_has_tag(item: Dict, key: str, tag: str) -> bool:
+    return str(tag or "").strip().lower() in item_tag_values(item, key)
+
+
+def scenario_mentions_any(scenario: str, keywords: set[str]) -> bool:
+    text = normalize_search_text(scenario)
+    return any(f" {keyword} " in text for keyword in keywords)
+
+
 def item_uid(item: Dict) -> str:
     return f"{item_source(item)}:{item.get('id')}"
 
@@ -725,6 +756,8 @@ def is_allowed_bottom(item: Dict, scenario: str, style: str) -> bool:
             return False
         if contains_any(title, RAIN_BAD_BOTTOM_KEYWORDS):
             return False
+        if item_has_tag(item, "usecase_tags", "fishing") and item_bool(item, "many_pockets"):
+            return cat in {"trousers", "jeans"}
         return cat in {"trousers", "jeans"}
 
     if "ripped" in title or "distressed" in title:
@@ -778,11 +811,16 @@ def is_allowed_shoes(item: Dict, scenario: str, style: str) -> bool:
         return is_gym_like_shoe(item)
 
     if profile == "rain":
-        if cat != "boots":
+        if cat not in {"boots", "sneakers"}:
             return False
         if any(kw in title for kw in RAIN_BAD_SHOE_KEYWORDS):
             return False
-        if not contains_any(title, RAIN_STRONG_SHOE_KEYWORDS):
+        if not (
+            contains_any(title, RAIN_STRONG_SHOE_KEYWORDS)
+            or item_bool(item, "waterproof")
+            or item_has_tag(item, "usecase_tags", "heavy_rain")
+            or item_has_tag(item, "usecase_tags", "outdoor")
+        ):
             return False
         return True
 
@@ -845,7 +883,16 @@ def is_allowed_outerwear(item: Dict, scenario: str, style: str) -> bool:
             return False
         if contains_any(title, RAIN_BAD_OUTERWEAR_KEYWORDS):
             return False
-        return cat in {"jacket", "coat"}
+        if cat not in {"jacket", "coat"}:
+            return False
+        return (
+            item_bool(item, "waterproof")
+            or item_bool(item, "hooded")
+            or item_bool(item, "windproof")
+            or item_has_tag(item, "usecase_tags", "bad_weather")
+            or item_has_tag(item, "feature_tags", "storm_ready")
+            or contains_any(title, GOOD_RAIN_OUTERWEAR_KEYWORDS)
+        )
 
     if profile == "hot_weather":
         return False
@@ -878,6 +925,19 @@ def item_base_score(item: Dict, scenario: str, style: str, gender: str, role: st
     for kw in rule["preferred_keywords"]:
         if kw in title:
             score += 2
+
+    if item_bool(item, "technical"):
+        score += 1
+    if item_bool(item, "insulated") and detect_scenario_profile(scenario) == "cold_weather":
+        score += 5
+    if item_bool(item, "waterproof") and detect_scenario_profile(scenario) == "rain":
+        score += 6
+    if item_bool(item, "many_pockets") and scenario_mentions_any(scenario, {"рыбалку", "рыбалка", "fishing"}):
+        score += 7
+    if item_has_tag(item, "usecase_tags", "fishing") and scenario_mentions_any(scenario, {"рыбалку", "рыбалка", "fishing"}):
+        score += 10
+    if item_has_tag(item, "usecase_tags", "outdoor") and scenario_mentions_any(scenario, {"поход", "горы", "outdoor", "hiking", "рыбалка"}):
+        score += 6
 
     if "minimal" in style_lower or "миним" in style_lower:
         score += keyword_penalty(title, BAD_MINIMAL_KEYWORDS, weight=4)
@@ -919,11 +979,21 @@ def item_base_score(item: Dict, scenario: str, style: str, gender: str, role: st
         if role == "outerwear":
             score += keyword_score(title, GOOD_RAIN_OUTERWEAR_KEYWORDS, weight=5)
             score += keyword_penalty(title, RAIN_BAD_OUTERWEAR_KEYWORDS, weight=8)
+            if item_bool(item, "waterproof"):
+                score += 8
+            if item_bool(item, "hooded"):
+                score += 4
+            if item_bool(item, "windproof"):
+                score += 4
         elif role == "bottom":
             score += keyword_penalty(title, RAIN_BAD_BOTTOM_KEYWORDS, weight=10)
+            if item_bool(item, "many_pockets") and scenario_mentions_any(scenario, {"рыбалка", "рыбалку", "fishing"}):
+                score += 5
         elif role == "shoes":
             score += keyword_score(title, RAIN_GOOD_SHOE_KEYWORDS, weight=4)
             score += keyword_penalty(title, RAIN_BAD_SHOE_KEYWORDS, weight=8)
+            if item_bool(item, "waterproof"):
+                score += 8
 
     if profile == "gym":
         if role == "top":
