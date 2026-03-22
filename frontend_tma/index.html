@@ -709,6 +709,29 @@
             }
         };
 
+        function formatPrice(price, currency = 'RUB') {
+            if (price === null || price === undefined || price === '') {
+                return '—';
+            }
+
+            const numericPrice = Number(price);
+            const safeCurrency = (currency || 'RUB').toUpperCase();
+
+            if (!Number.isFinite(numericPrice)) {
+                return `${price}`;
+            }
+
+            const formatted = Number.isInteger(numericPrice)
+                ? numericPrice.toLocaleString('ru-RU')
+                : numericPrice.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            if (safeCurrency === 'RUB') return `${formatted} ₽`;
+            if (safeCurrency === 'EUR') return `€${formatted}`;
+            if (safeCurrency === 'USD') return `$${formatted}`;
+            if (safeCurrency === 'TRY') return `₺${formatted}`;
+            return `${formatted} ${safeCurrency}`;
+        }
+
         window.openWardrobeEditor = function(itemStr) {
             const item = JSON.parse(decodeURIComponent(itemStr));
             document.getElementById('edit-item-id').value = item.id;
@@ -807,7 +830,7 @@
                 gridEl.innerHTML = '';
 
                 favorites.forEach((item, index) => {
-                    const price = item.price ? item.price : '0.00';
+                    const priceText = formatPrice(item.price, item.currency);
                     const card = document.createElement('div');
                     card.className = "group cursor-pointer animate-fade-up";
                     card.style.animationDelay = `${index * 0.05}s`;
@@ -825,7 +848,7 @@
                             </button>
                         </div>
                         <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${item.title}</p>
-                        <p class="text-sm font-bold text-fashion">$${price}</p>
+                        <p class="text-sm font-bold text-fashion">${priceText}</p>
                     `;
                     gridEl.appendChild(card);
                 });
@@ -913,14 +936,15 @@
 
                     const isFav = favorites.some(f => f.id === item.id);
                     const heartClass = isFav ? "text-red-500 fill-current" : "text-gray-400";
-                    const price = item.price ? item.price : '0.00';
+                    const priceText = formatPrice(item.price, item.currency);
                     const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category || 'clothes'}`;
 
                     const safeItem = {
                         id: item.id,
                         title: item.title || 'Без названия',
                         category: item.category || 'unknown',
-                        price: price,
+                        price: item.price,
+                        currency: item.currency || 'RUB',
                         image_url: imgUrl
                     };
 
@@ -938,7 +962,7 @@
                             </div>
                             <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">${safeItem.category}</h4>
                             <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${safeItem.title}</p>
-                            <p class="text-sm font-bold text-fashion">$${safeItem.price}</p>
+                            <p class="text-sm font-bold text-fashion">${priceText}</p>
                         </div>
                     `;
                 });

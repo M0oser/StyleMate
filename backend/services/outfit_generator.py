@@ -10,6 +10,7 @@ class WardrobeItem:
     id: int
     title: str
     price: Optional[float]
+    currency: Optional[str]
     url: str
     image_url: Optional[str]
     cat: str
@@ -158,6 +159,7 @@ def load_user_wardrobe(
                 id=pid,
                 title=title,
                 price=None,
+                currency=None,
                 url="",
                 image_url=image_url,
                 cat=normalize_category(category),
@@ -198,10 +200,11 @@ def load_shop_wardrobe(db_path: str = "database/wardrobe.db", limit: int = 300) 
 
     table_columns = get_shop_catalog_columns(db_path=db_path) if table_name == "shop_catalog" else set()
     source_expr = "source" if "source" in table_columns else "'shop'"
+    currency_expr = "currency" if "currency" in table_columns else "'RUB'"
 
     try:
         cur.execute(f"""
-            SELECT id, title, price, url, image_url, category, color, {source_expr} as source
+            SELECT id, title, price, {currency_expr} as currency, url, image_url, category, color, {source_expr} as source
             FROM {table_name}
             WHERE category IS NOT NULL
             ORDER BY id DESC
@@ -212,7 +215,7 @@ def load_shop_wardrobe(db_path: str = "database/wardrobe.db", limit: int = 300) 
         con.close()
 
     items: List[WardrobeItem] = []
-    for pid, title, price, url, image_url, category, color, source in rows:
+    for pid, title, price, currency, url, image_url, category, color, source in rows:
         cat = normalize_category(category)
 
         if cat in {"unknown", "accessory"}:
@@ -223,6 +226,7 @@ def load_shop_wardrobe(db_path: str = "database/wardrobe.db", limit: int = 300) 
                 id=pid,
                 title=title,
                 price=price,
+                currency=(currency or "RUB").strip().upper() if isinstance(currency, str) else "RUB",
                 url=url or "",
                 image_url=image_url,
                 cat=cat,

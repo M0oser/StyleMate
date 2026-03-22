@@ -107,6 +107,7 @@ async def api_generate_outfits(req: OutfitRequest, request: Request):
             "category": x.cat,
             "color": x.color,
             "price": x.price,
+            "currency": x.currency,
             "image_url": x.image_url,
             "url": x.url,
             "source": x.source,
