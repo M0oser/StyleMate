@@ -164,7 +164,7 @@
 
     <header class="header-shell sticky top-0 z-40 px-5 py-4 flex justify-between items-center border-b">
         <h1 class="text-xl font-bold tracking-tighter uppercase">StyleMate.</h1>
-        <div class="w-8 h-8 bg-white/80 shadow-sm rounded-full flex items-center justify-center text-sm">✨</div>
+        <button id="profile-btn" type="button" class="w-8 h-8 bg-white/80 shadow-sm rounded-full flex items-center justify-center text-sm">✨</button>
     </header>
 
     <main id="tab-outfit" class="tab-content active px-5 py-4">
@@ -177,7 +177,7 @@
                 </div>
                 <input type="hidden" id="gender-input" value="male">
             </div>
-            <p class="max-w-[16rem] text-sm text-gray-600 font-medium leading-relaxed">Выбери повод и источник вещей, ИИ соберет аккуратный образ под твой запрос.</p>
+            <p class="max-w-[17rem] text-sm text-gray-600 font-medium leading-relaxed">Выбери сценарий, затем отметь 1–2 вещи в гардеробе, и StyleMate дособерёт образ вокруг них.</p>
         </div>
 
         <form id="outfit-form" class="space-y-6 mb-8">
@@ -195,31 +195,19 @@
             </div>
 
             <div class="premium-panel rounded-[1.75rem] p-4">
-                <div class="flex items-start justify-between gap-4 mb-3">
+                <div class="flex items-start justify-between gap-4">
                     <div>
-                        <p class="text-sm font-semibold text-fashion">Источник вещей</p>
-                        <p class="text-xs text-gray-500 mt-1">Выбери, откуда собирать образ.</p>
+                        <p class="text-sm font-semibold text-fashion">Completion-first режим</p>
+                        <p class="text-xs text-gray-500 mt-1">Основной сценарий продукта: выбери anchor-вещи во вкладке “Гардероб”, и мы доберём недостающие позиции из каталога.</p>
                     </div>
-                    <input type="hidden" id="source-mode" value="mixed">
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5" id="source-toggle">
-                    <button type="button" class="source-chip text-left bg-white/70 text-gray-600 border border-transparent rounded-2xl px-4 py-3 shadow-sm transition-all active:scale-[0.98]" data-value="user">
-                        <span class="block text-sm font-semibold">Личный</span>
-                        <span class="block text-xs text-gray-500 mt-1">Только твои вещи</span>
-                    </button>
-                    <button type="button" class="source-chip text-left bg-white/70 text-gray-600 border border-transparent rounded-2xl px-4 py-3 shadow-sm transition-all active:scale-[0.98]" data-value="shop">
-                        <span class="block text-sm font-semibold">Каталог</span>
-                        <span class="block text-xs text-gray-500 mt-1">Вещи из базы магазина</span>
-                    </button>
-                    <button type="button" class="source-chip active-chip text-left bg-white text-fashion border border-gray-200/80 rounded-2xl px-4 py-3 shadow-sm transition-all active:scale-[0.98]" data-value="mixed">
-                        <span class="block text-sm font-semibold">Смешанный</span>
-                        <span class="block text-xs text-gray-500 mt-1">Гардероб и каталог вместе</span>
+                    <button type="button" onclick="switchTab('wardrobe'); toggleCompletionSelectionMode(true);" class="bg-white/90 border border-white text-fashion font-medium text-sm px-4 py-2.5 rounded-full shadow-[0_10px_24px_rgba(23,19,17,0.05)] active:scale-95 transition-all whitespace-nowrap">
+                        К гардеробу
                     </button>
                 </div>
             </div>
 
             <button id="submit-btn" type="submit" class="premium-button w-full text-white font-semibold text-sm uppercase tracking-[0.2em] py-4 rounded-[1.4rem] active:scale-[0.98] transition-all">
-                Сгенерировать образ
+                Выбрать anchor-вещи
             </button>
         </form>
 
@@ -305,6 +293,47 @@
         </div>
     </div>
 
+    <div id="profile-modal" class="hidden fixed inset-0 z-[70] bg-black/35 backdrop-blur-sm px-4 py-6">
+        <div class="max-w-md mx-auto bg-white rounded-[1.75rem] shadow-2xl border border-white/80 p-5 mt-10">
+            <div class="flex items-start justify-between gap-4 mb-4">
+                <div>
+                    <h3 id="profile-modal-title" class="text-lg font-semibold tracking-tight">Твой профиль</h3>
+                    <p class="text-xs text-gray-500 mt-1">Сохрани базовые предпочтения, чтобы рекомендации стали точнее.</p>
+                </div>
+                <button id="profile-close-btn" type="button" class="w-9 h-9 rounded-full bg-gray-100 text-gray-500 text-sm font-bold">×</button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label for="profile-display-name" class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Имя</label>
+                    <input id="profile-display-name" type="text" maxlength="80" placeholder="Как тебя подписывать" class="w-full bg-white border border-gray-200 text-fashion py-3 px-4 rounded-xl focus:outline-none focus:ring-2 focus:ring-fashion">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2">Гендерный профиль</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" class="profile-gender-chip bg-white text-gray-500 border border-gray-200 rounded-2xl px-3 py-3 text-sm font-medium" data-value="male">Мужской</button>
+                        <button type="button" class="profile-gender-chip bg-white text-gray-500 border border-gray-200 rounded-2xl px-3 py-3 text-sm font-medium" data-value="female">Женский</button>
+                        <button type="button" class="profile-gender-chip bg-white text-gray-500 border border-gray-200 rounded-2xl px-3 py-3 text-sm font-medium" data-value="unisex">Unisex</button>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs uppercase tracking-wider text-gray-400">Предпочтения по стилю</label>
+                        <span id="profile-style-counter" class="text-xs text-gray-400">0 / 3</span>
+                    </div>
+                    <div id="profile-style-grid" class="grid grid-cols-2 gap-2"></div>
+                </div>
+
+                <div class="space-y-2 pt-1">
+                    <button id="profile-save-btn" type="button" class="premium-button w-full text-white font-semibold py-3 rounded-xl">Сохранить профиль</button>
+                    <p id="profile-status" class="text-xs text-center text-gray-500 min-h-[1rem]"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         const tg = window.Telegram?.WebApp || null;
         if (tg) {
@@ -317,10 +346,27 @@
         let wardrobeItemsCache = [];
         let wardrobeSelectionMode = false;
         let selectedWardrobeIds = new Set();
+        let completionSelectionMode = false;
+        let selectedCompletionIds = new Set();
+        let currentProfile = null;
+        let currentUserId = null;
+        let selectedProfileStyles = new Set();
+        let profileModalLocked = false;
+
+        const COMPLETION_ROLE_LABELS = {
+            top: 'верх',
+            bottom: 'низ',
+            dress: 'платье',
+            shoes: 'обувь',
+            outerwear: 'верхняя одежда',
+            active_top: 'верх',
+            active_bottom: 'низ',
+            running_shoes: 'обувь',
+        };
 
         const CATEGORY_OPTIONS = [
-            'unknown', 'tshirt', 'shirt', 'sweater', 'hoodie',
-            'jeans', 'trousers', 'shorts', 'skirt',
+            'unknown', 'tshirt', 'top', 'shirt', 'sweater', 'hoodie',
+            'jeans', 'trousers', 'shorts', 'skirt', 'dress',
             'sneakers', 'boots', 'shoes', 'loafers',
             'jacket', 'coat', 'blazer'
         ];
@@ -343,8 +389,16 @@
         const submitBtn = document.getElementById('submit-btn');
         const genderChips = document.querySelectorAll('.gender-chip');
         const genderInput = document.getElementById('gender-input');
-        const sourceModeInput = document.getElementById('source-mode');
-        const sourceChips = document.querySelectorAll('.source-chip');
+        const profileBtn = document.getElementById('profile-btn');
+        const profileModal = document.getElementById('profile-modal');
+        const profileCloseBtn = document.getElementById('profile-close-btn');
+        const profileSaveBtn = document.getElementById('profile-save-btn');
+        const profileStatus = document.getElementById('profile-status');
+        const profileDisplayNameInput = document.getElementById('profile-display-name');
+        const profileGenderChips = document.querySelectorAll('.profile-gender-chip');
+        const profileStyleGrid = document.getElementById('profile-style-grid');
+        const profileStyleCounter = document.getElementById('profile-style-counter');
+        const profileModalTitle = document.getElementById('profile-modal-title');
 
         function ensureOwnerToken() {
             const storageKey = 'stylemate_owner_token';
@@ -367,6 +421,163 @@
             };
         }
 
+        function selectableStyleOptions() {
+            return STYLE_OPTIONS.filter(style => style !== 'unknown');
+        }
+
+        function setProfileStatus(message = '', isError = false) {
+            profileStatus.textContent = message;
+            profileStatus.classList.toggle('text-red-500', isError);
+            profileStatus.classList.toggle('text-gray-500', !isError);
+        }
+
+        function setActiveProfileGender(value) {
+            profileGenderChips.forEach(chip => {
+                const isActive = chip.dataset.value === value;
+                chip.classList.toggle('bg-fashion', isActive);
+                chip.classList.toggle('text-white', isActive);
+                chip.classList.toggle('border-fashion', isActive);
+                chip.classList.toggle('bg-white', !isActive);
+                chip.classList.toggle('text-gray-500', !isActive);
+                chip.classList.toggle('border-gray-200', !isActive);
+            });
+        }
+
+        function getActiveProfileGender() {
+            return document.querySelector('.profile-gender-chip.bg-fashion')?.dataset.value || 'male';
+        }
+
+        function updateProfileStyleCounter() {
+            profileStyleCounter.textContent = `${selectedProfileStyles.size} / 3`;
+        }
+
+        function renderProfileStyleOptions() {
+            profileStyleGrid.innerHTML = selectableStyleOptions().map(style => {
+                const isSelected = selectedProfileStyles.has(style);
+                return `
+                    <button type="button" class="profile-style-chip ${isSelected ? 'bg-fashion text-white border-fashion' : 'bg-white text-gray-600 border-gray-200'} border rounded-2xl px-3 py-3 text-sm font-medium" data-value="${style}">
+                        ${style}
+                    </button>
+                `;
+            }).join('');
+
+            profileStyleGrid.querySelectorAll('.profile-style-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    const value = chip.dataset.value;
+                    if (selectedProfileStyles.has(value)) {
+                        selectedProfileStyles.delete(value);
+                    } else {
+                        if (selectedProfileStyles.size >= 3) {
+                            setProfileStatus('Можно выбрать до 3 стилей.', true);
+                            return;
+                        }
+                        selectedProfileStyles.add(value);
+                    }
+
+                    setProfileStatus('');
+                    renderProfileStyleOptions();
+                });
+            });
+
+            updateProfileStyleCounter();
+        }
+
+        function applyProfileToUI(profile) {
+            currentProfile = profile;
+            profileDisplayNameInput.value = profile.display_name || '';
+            selectedProfileStyles = new Set(profile.style_preferences || []);
+            renderProfileStyleOptions();
+            setActiveProfileGender(profile.gender || 'male');
+
+            if (profile.gender === 'female') {
+                document.querySelector('.gender-chip[data-value="female"]')?.click();
+            } else {
+                document.querySelector('.gender-chip[data-value="male"]')?.click();
+            }
+
+            const badge = (profile.display_name || (profile.gender === 'female' ? 'Ж' : profile.gender === 'unisex' ? 'U' : 'М')).slice(0, 1).toUpperCase();
+            profileBtn.textContent = badge || '✨';
+        }
+
+        async function bootstrapSession() {
+            const response = await fetch('/api/auth/session', {
+                method: 'POST',
+                headers: ownerHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Не удалось создать сессию (${response.status})`);
+            }
+
+            const data = await response.json();
+            currentUserId = data.user_id || null;
+            applyProfileToUI(data.profile);
+
+            if (data.onboarding_required) {
+                openProfileModal(true);
+            }
+        }
+
+        async function fetchProfile() {
+            const response = await fetch('/api/profile', {
+                headers: ownerHeaders(),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Не удалось загрузить профиль (${response.status})`);
+            }
+
+            const data = await response.json();
+            applyProfileToUI(data.profile);
+            return data.profile;
+        }
+
+        function openProfileModal(forceOnboarding = false) {
+            profileModalLocked = forceOnboarding;
+            profileModalTitle.textContent = forceOnboarding ? 'Добро пожаловать в StyleMate' : 'Твой профиль';
+            profileCloseBtn.classList.toggle('hidden', forceOnboarding);
+            profileModal.classList.remove('hidden');
+        }
+
+        function closeProfileModal() {
+            if (profileModalLocked) return;
+            profileModal.classList.add('hidden');
+            setProfileStatus('');
+        }
+
+        async function saveProfile() {
+            const payload = {
+                display_name: profileDisplayNameInput.value.trim(),
+                gender: getActiveProfileGender(),
+                style_preferences: Array.from(selectedProfileStyles),
+                onboarding_completed: true,
+            };
+
+            if (payload.style_preferences.length === 0) {
+                setProfileStatus('Выбери хотя бы 1 стиль.', true);
+                return;
+            }
+
+            const response = await fetch('/api/profile', {
+                method: 'PATCH',
+                headers: ownerHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify(payload),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.detail || `HTTP error ${response.status}`);
+            }
+
+            applyProfileToUI(data.profile);
+            profileModalLocked = false;
+            setProfileStatus('Профиль сохранён.');
+            setTimeout(() => {
+                profileModal.classList.add('hidden');
+                setProfileStatus('');
+            }, 500);
+        }
+
         function fillSelectOptions(selectEl, values) {
             selectEl.innerHTML = values.map(value => `
                 <option value="${value}">${value}</option>
@@ -376,6 +587,7 @@
         fillSelectOptions(document.getElementById('edit-item-category'), CATEGORY_OPTIONS);
         fillSelectOptions(document.getElementById('edit-item-color'), COLOR_OPTIONS);
         fillSelectOptions(document.getElementById('edit-item-style'), STYLE_OPTIONS);
+        renderProfileStyleOptions();
 
         chips.forEach(chip => {
             chip.addEventListener('click', () => {
@@ -421,35 +633,45 @@
             });
         });
 
-        sourceChips.forEach(chip => {
+        profileGenderChips.forEach(chip => {
             chip.addEventListener('click', () => {
-                sourceChips.forEach(c => {
-                    c.classList.remove('active-chip', 'bg-white', 'text-fashion', 'border-gray-200/80');
-                    c.classList.add('bg-white/70', 'text-gray-600', 'border-transparent');
-                });
-
-                chip.classList.remove('bg-white/70', 'text-gray-600', 'border-transparent');
-                chip.classList.add('active-chip', 'bg-white', 'text-fashion', 'border-gray-200/80');
-                sourceModeInput.value = chip.dataset.value;
-                updateButtonText();
+                setActiveProfileGender(chip.dataset.value);
+                setProfileStatus('');
             });
         });
 
-        function sourceModeLabel(value) {
-            if (value === 'user') return 'личный гардероб';
-            if (value === 'shop') return 'каталог магазина';
-            if (value === 'mixed') return 'смешанный режим';
-            return 'источник';
-        }
+        profileBtn.addEventListener('click', () => openProfileModal(false));
+        profileCloseBtn.addEventListener('click', closeProfileModal);
+        profileSaveBtn.addEventListener('click', async () => {
+            try {
+                await saveProfile();
+            } catch (error) {
+                console.error('Ошибка сохранения профиля:', error);
+                setProfileStatus(error.message || 'Не удалось сохранить профиль.', true);
+            }
+        });
+
+        profileModal.addEventListener('click', (e) => {
+            if (e.target.id === 'profile-modal') {
+                closeProfileModal();
+            }
+        });
 
         function updateButtonText() {
-            const modeText = sourceModeLabel(sourceModeInput.value);
+            const selectedCount = selectedCompletionIds.size;
 
-            if (hiddenInput.value && hiddenInput.value === lastGeneratedScenario) {
-                submitBtn.innerText = `Подобрать новый образ (${modeText})`;
+            if (selectedCount >= 1 && selectedCount <= 2) {
+                submitBtn.innerText = 'Дособрать образ';
+            } else if (hiddenInput.value && hiddenInput.value === lastGeneratedScenario) {
+                submitBtn.innerText = 'Выбери 1–2 вещи для нового образа';
             } else {
-                submitBtn.innerText = `Сгенерировать образ (${modeText})`;
+                submitBtn.innerText = 'Выбрать anchor-вещи';
             }
+        }
+
+        function resetCompletionSelectionState() {
+            completionSelectionMode = false;
+            selectedCompletionIds = new Set();
         }
 
         function switchTab(tabName) {
@@ -475,8 +697,24 @@
 
         window.toggleWardrobeSelectionMode = function(forceState = null) {
             wardrobeSelectionMode = forceState === null ? !wardrobeSelectionMode : Boolean(forceState);
+            if (wardrobeSelectionMode) {
+                completionSelectionMode = false;
+                selectedCompletionIds = new Set();
+            }
             if (!wardrobeSelectionMode) {
                 selectedWardrobeIds = new Set();
+            }
+            loadMyWardrobe();
+        };
+
+        window.toggleCompletionSelectionMode = function(forceState = null) {
+            completionSelectionMode = forceState === null ? !completionSelectionMode : Boolean(forceState);
+            if (completionSelectionMode) {
+                wardrobeSelectionMode = false;
+                selectedWardrobeIds = new Set();
+            }
+            if (!completionSelectionMode) {
+                selectedCompletionIds = new Set();
             }
             loadMyWardrobe();
         };
@@ -490,7 +728,25 @@
             loadMyWardrobe();
         };
 
+        window.toggleCompletionSelection = function(itemId) {
+            if (selectedCompletionIds.has(itemId)) {
+                selectedCompletionIds.delete(itemId);
+            } else {
+                if (selectedCompletionIds.size >= 2) {
+                    alert('Для completion можно выбрать только 1–2 вещи.');
+                    return;
+                }
+                selectedCompletionIds.add(itemId);
+            }
+            loadMyWardrobe();
+        };
+
         window.handleWardrobeCardClick = function(itemStr, itemId) {
+            if (completionSelectionMode) {
+                toggleCompletionSelection(itemId);
+                return;
+            }
+
             if (wardrobeSelectionMode) {
                 toggleWardrobeSelection(itemId);
                 return;
@@ -557,6 +813,229 @@
             }
         };
 
+        function renderResultItemCard(item, index, roleLabel = '') {
+            if (!item.id) item.id = 'item_' + Math.random().toString(36).substr(2, 9);
+
+            const isFav = favorites.some(f => f.id === item.id);
+            const heartClass = isFav ? "text-red-500 fill-current" : "text-gray-400";
+            const formattedPrice = formatPrice(item.price, item.currency);
+            const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category || 'clothes'}`;
+            const safeItem = {
+                id: item.id,
+                title: item.title || 'Без названия',
+                category: item.category || 'unknown',
+                price: item.price,
+                currency: item.currency || 'RUB',
+                image_url: imgUrl
+            };
+            const itemDataStr = encodeURIComponent(JSON.stringify(safeItem));
+
+            return `
+                <div class="group cursor-pointer animate-fade-up" style="animation-delay: ${index * 0.06}s">
+                    <div class="relative aspect-[4/5] bg-white/80 backdrop-blur overflow-hidden mb-3 rounded-[1.35rem] border border-white/80 shadow-[0_14px_32px_rgba(23,19,17,0.07)]">
+                        <img src="${imgUrl}" alt="${safeItem.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/400x500/eeeeee/999999?text=Error'">
+                        <button onclick="toggleFavorite(this, '${itemDataStr}')" class="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-sm transition-transform active:scale-75 ${heartClass}">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path>
+                            </svg>
+                        </button>
+                        ${roleLabel ? `
+                            <div class="absolute top-3 left-3 px-2.5 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-black/80 text-white shadow-sm">
+                                ${roleLabel}
+                            </div>
+                        ` : ''}
+                    </div>
+                    <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">${safeItem.category}</h4>
+                    <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${safeItem.title}</p>
+                    <p class="text-sm font-bold text-fashion">${formattedPrice}</p>
+                    ${item.url ? `<a href="${item.url}" target="_blank" rel="noopener noreferrer" class="inline-block mt-2 text-xs font-semibold text-fashion underline underline-offset-2">Где купить</a>` : ''}
+                </div>
+            `;
+        }
+
+        function normalizeCompletionScenario(value) {
+            const normalized = (value || '').trim().toLowerCase();
+            if (!normalized) return 'casual_daily';
+            if (normalized.includes('офис') || normalized.includes('office')) return 'office';
+            if (normalized.includes('свид') || normalized.includes('date')) return 'date';
+            if (normalized.includes('gym') || normalized.includes('зал') || normalized.includes('трен')) return 'gym';
+            if (normalized.includes('run') || normalized.includes('бег')) return 'running';
+            if (normalized.includes('street') || normalized.includes('стрит')) return 'street';
+            if (normalized.includes('дожд') || normalized.includes('rain') || normalized.includes('outdoor') || normalized.includes('прогул')) {
+                return 'outdoor_light';
+            }
+            return 'casual_daily';
+        }
+
+        function normalizeCompletionResultItem(item, fallbackRole = '') {
+            if (!item) return null;
+
+            return {
+                id: item.id || item.product_id || `item_${Math.random().toString(36).slice(2, 11)}`,
+                title: item.title || 'Без названия',
+                category: item.category || fallbackRole || 'unknown',
+                price: item.price ?? item.current_price ?? null,
+                currency: item.currency || 'RUB',
+                image_url: item.image_url || item.primary_image_url || '',
+                url: item.url || item.product_url || '',
+                role: item.role || item.matched_missing_role || fallbackRole || '',
+            };
+        }
+
+        function buildCompletionViewModel(data) {
+            const anchorItems = (data.anchors || [])
+                .map(item => normalizeCompletionResultItem(item, item.role))
+                .filter(Boolean);
+
+            const addedItems = [];
+            (data.fill_role_order || []).forEach(role => {
+                const firstFill = data.fills?.[role]?.[0];
+                const normalized = normalizeCompletionResultItem(firstFill, role);
+                if (normalized) addedItems.push(normalized);
+            });
+            (data.optional_fill_role_order || []).forEach(role => {
+                const firstFill = data.optional_fills?.[role]?.[0];
+                const normalized = normalizeCompletionResultItem(firstFill, role);
+                if (normalized) addedItems.push(normalized);
+            });
+
+            const unresolvedRoles = data.completion_state?.missing_required_roles_without_results || [];
+            const completionPossible = unresolvedRoles.length === 0;
+            const anchorLabels = anchorItems.map(item => item.title).filter(Boolean).join(', ');
+            const addedLabels = addedItems.map(item => item.title).filter(Boolean).join(', ');
+
+            const scenarioLabel = hiddenInput.value || data.scenario || 'образ';
+
+            let explanation = 'Не удалось завершить образ.';
+            if (completionPossible && addedItems.length) {
+                explanation = `Собрал образ для сценария "${scenarioLabel}": оставил как основу ${anchorLabels || 'твои anchor-вещи'} и добавил ${addedLabels}.`;
+            } else if (completionPossible) {
+                explanation = `Образ для сценария "${scenarioLabel}" уже собран: anchor-вещи закрывают нужные роли.`;
+            } else if (addedItems.length) {
+                explanation = `Не удалось полностью завершить образ для сценария "${scenarioLabel}": оставил как основу ${anchorLabels || 'твои anchor-вещи'}, но не закрыл все роли.`;
+            }
+
+            return {
+                scenario: scenarioLabel,
+                anchorItems,
+                addedItems,
+                completionPossible,
+                missingRoles: unresolvedRoles,
+                explanation,
+            };
+        }
+
+        function renderCompletionResult(data) {
+            const resultsContainer = document.getElementById('results-container');
+            const viewModel = buildCompletionViewModel(data);
+            const anchorItems = viewModel.anchorItems;
+            const addedItems = viewModel.addedItems;
+            const explanation = viewModel.explanation;
+            const completionPossible = viewModel.completionPossible;
+            const missingRoles = viewModel.missingRoles;
+            const missingRoleLabels = missingRoles.map(role => COMPLETION_ROLE_LABELS[role] || role);
+
+            let htmlContent = `
+                <div class="mb-4">
+                    <h3 class="text-lg font-semibold tracking-tight mb-3">Outfit completion</h3>
+                    <div class="outfit-note p-4 rounded-[1.5rem]">
+                        <p class="text-xs uppercase tracking-wider text-gray-400 mb-2">Сценарий: ${viewModel.scenario}</p>
+                        <p class="text-sm text-gray-700 leading-relaxed">${explanation}</p>
+                        <p class="text-xs mt-3 ${completionPossible ? 'text-emerald-600' : 'text-amber-600'} font-semibold">
+                            ${completionPossible ? 'Образ успешно дособран' : `Не удалось закрыть роли: ${missingRoleLabels.join(', ') || 'unknown'}`}
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            if (anchorItems.length) {
+                htmlContent += `
+                    <div class="mb-6">
+                        <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 mb-3">Твои anchor-вещи</h4>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-6">
+                            ${anchorItems.map((item, index) => renderResultItemCard(item, index, 'Anchor')).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (addedItems.length) {
+                htmlContent += `
+                    <div class="mb-6">
+                        <h4 class="text-sm font-semibold uppercase tracking-[0.18em] text-gray-400 mb-3">Что добавить</h4>
+                        <div class="grid grid-cols-2 gap-x-4 gap-y-6">
+                            ${addedItems.map((item, index) => renderResultItemCard(item, index, 'Shop')).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            resultsContainer.innerHTML = htmlContent;
+            resultsContainer.classList.remove('hidden');
+        }
+
+        async function requestOutfitCompletion() {
+            const currentScenario = hiddenInput.value;
+            const currentGender = genderInput.value;
+            const selectedIds = Array.from(selectedCompletionIds);
+
+            if (!currentScenario) {
+                alert('Сначала выбери сценарий на вкладке "Образ".');
+                return;
+            }
+
+            if (selectedIds.length < 1 || selectedIds.length > 2) {
+                alert('Выбери 1 или 2 вещи для дособора образа.');
+                return;
+            }
+
+            const skeleton = document.getElementById('skeleton-loader');
+            const resultsContainer = document.getElementById('results-container');
+
+            switchTab('outfit');
+            skeleton.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            resultsContainer.innerHTML = '';
+
+            try {
+                const completionScenario = normalizeCompletionScenario(currentScenario);
+                const response = await fetch('/api/v1/completion', {
+                    method: 'POST',
+                    headers: ownerHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({
+                        anchor_item_ids: selectedIds,
+                        scenario: completionScenario,
+                        gender_target: currentGender === 'female' ? 'women' : 'men',
+                        include_optional_fills: true,
+                        limit_per_role: 4
+                    })
+                });
+
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error?.message || data.detail || `HTTP error ${response.status}`);
+                }
+
+                renderCompletionResult(data);
+                lastGeneratedScenario = currentScenario;
+                updateButtonText();
+                resetCompletionSelectionState();
+            } catch (error) {
+                console.error('Ошибка completion:', error);
+                resultsContainer.innerHTML = `
+                    <div class="outfit-note p-4 rounded-[1.4rem]">
+                        <p class="text-red-600 text-sm font-bold mb-1">Не удалось дособрать образ:</p>
+                        <p class="text-red-500 text-xs break-words">${error.message}</p>
+                    </div>
+                `;
+                resultsContainer.classList.remove('hidden');
+            } finally {
+                skeleton.classList.add('hidden');
+            }
+        }
+
+        window.requestOutfitCompletion = requestOutfitCompletion;
+
         async function loadMyWardrobe() {
             const container = document.querySelector('#tab-wardrobe');
 
@@ -570,12 +1049,17 @@
                 selectedWardrobeIds = new Set(
                     Array.from(selectedWardrobeIds).filter(itemId => existingIds.has(itemId))
                 );
+                selectedCompletionIds = new Set(
+                    Array.from(selectedCompletionIds).filter(itemId => existingIds.has(itemId))
+                );
 
                 if (data.length === 0) {
                     resetWardrobeSelectionState();
+                    resetCompletionSelectionState();
                 }
 
                 const selectedCount = selectedWardrobeIds.size;
+                const completionSelectedCount = selectedCompletionIds.size;
                 const hasItems = data.length > 0;
 
                 let html = `
@@ -586,6 +1070,9 @@
                         </div>
                         <div class="flex items-center gap-2">
                             ${hasItems ? `
+                                <button onclick="toggleCompletionSelectionMode(${completionSelectionMode ? 'false' : 'true'})" class="${completionSelectionMode ? 'bg-fashion text-white border-fashion' : 'bg-white/85 border border-white text-fashion'} font-medium text-sm px-4 py-2.5 rounded-full shadow-[0_10px_24px_rgba(23,19,17,0.05)] active:scale-95 transition-all">
+                                    ${completionSelectionMode ? 'Отменить' : 'Дособрать'}
+                                </button>
                                 <button onclick="toggleWardrobeSelectionMode(${wardrobeSelectionMode ? 'false' : 'true'})" class="bg-white/85 border border-white text-fashion font-medium text-sm px-4 py-2.5 rounded-full shadow-[0_10px_24px_rgba(23,19,17,0.05)] active:scale-95 transition-all">
                                     ${wardrobeSelectionMode ? 'Готово' : 'Выбрать'}
                                 </button>
@@ -619,6 +1106,26 @@
                     `;
                 }
 
+                if (completionSelectionMode && hasItems) {
+                    html += `
+                        <div class="premium-panel rounded-[1.6rem] p-4 mb-5">
+                            <div class="flex items-start justify-between gap-3 mb-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-fashion">Outfit completion</p>
+                                    <p class="text-xs text-gray-500 mt-1">Выбери 1–2 вещи, и StyleMate дособерёт образ из каталога.</p>
+                                </div>
+                                <div class="text-sm font-semibold text-fashion">${completionSelectedCount} / 2</div>
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <div class="text-xs text-gray-500">Сценарий берётся со вкладки “Образ”: <span class="font-semibold text-fashion">${hiddenInput.value || 'не выбран'}</span></div>
+                                <button onclick="requestOutfitCompletion()" class="premium-button text-white font-medium text-sm px-4 py-3 rounded-2xl disabled:opacity-40 disabled:cursor-not-allowed" ${completionSelectedCount < 1 || completionSelectedCount > 2 ? 'disabled' : ''}>
+                                    Дособрать образ
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+
                 if (data.length === 0) {
                     html += `
                         <div class="premium-panel rounded-[2rem] p-10 flex flex-col items-center justify-center text-center mt-8">
@@ -636,6 +1143,7 @@
                     data.forEach((item, index) => {
                         const itemDataStr = encodeURIComponent(JSON.stringify(item));
                         const isSelected = selectedWardrobeIds.has(item.id);
+                        const isCompletionSelected = selectedCompletionIds.has(item.id);
                         let imageHtml = '';
 
                         if (item.image_url) {
@@ -651,7 +1159,7 @@
 
                         html += `
                             <div onclick="handleWardrobeCardClick('${itemDataStr}', ${item.id})" class="group cursor-pointer animate-fade-up flex flex-col items-center" style="animation-delay: ${index * 0.05}s">
-                                <div class="w-full aspect-square bg-white/80 backdrop-blur rounded-[1.35rem] shadow-[0_14px_32px_rgba(23,19,17,0.06)] border ${isSelected ? 'border-fashion ring-2 ring-fashion/20' : 'border-white/80'} mb-2 relative overflow-hidden">
+                                <div class="w-full aspect-square bg-white/80 backdrop-blur rounded-[1.35rem] shadow-[0_14px_32px_rgba(23,19,17,0.06)] border ${(isSelected || isCompletionSelected) ? 'border-fashion ring-2 ring-fashion/20' : 'border-white/80'} mb-2 relative overflow-hidden">
                                     ${imageHtml}
                                     <div class="absolute top-2 left-2 px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-white/90 text-gray-600 shadow-sm">
                                         ${item.vision_source || 'vision'}
@@ -662,8 +1170,14 @@
                                             ✓
                                         </div>
                                     ` : ''}
+                                    ${completionSelectionMode ? `
+                                        <div class="absolute inset-0 bg-black/10"></div>
+                                        <div class="absolute top-2 right-2 w-6 h-6 rounded-full border ${isCompletionSelected ? 'bg-fashion border-fashion text-white' : 'bg-white/90 border-white text-transparent'} flex items-center justify-center shadow-sm text-xs font-bold">
+                                            ★
+                                        </div>
+                                    ` : ''}
                                     ${item.manually_edited ? `
-                                        <div class="absolute ${wardrobeSelectionMode ? 'bottom-2 right-2' : 'top-2 right-2'} px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-fashion text-white shadow-sm">
+                                        <div class="absolute ${(wardrobeSelectionMode || completionSelectionMode) ? 'bottom-2 right-2' : 'top-2 right-2'} px-2 py-1 rounded-full text-[9px] font-semibold uppercase tracking-wide bg-fashion text-white shadow-sm">
                                             edited
                                         </div>
                                     ` : ''}
@@ -708,29 +1222,6 @@
                 renderFavorites();
             }
         };
-
-        function formatPrice(price, currency = 'RUB') {
-            if (price === null || price === undefined || price === '') {
-                return '—';
-            }
-
-            const numericPrice = Number(price);
-            const safeCurrency = (currency || 'RUB').toUpperCase();
-
-            if (!Number.isFinite(numericPrice)) {
-                return `${price}`;
-            }
-
-            const formatted = Number.isInteger(numericPrice)
-                ? numericPrice.toLocaleString('ru-RU')
-                : numericPrice.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-            if (safeCurrency === 'RUB') return `${formatted} ₽`;
-            if (safeCurrency === 'EUR') return `€${formatted}`;
-            if (safeCurrency === 'USD') return `$${formatted}`;
-            if (safeCurrency === 'TRY') return `₺${formatted}`;
-            return `${formatted} ${safeCurrency}`;
-        }
 
         window.openWardrobeEditor = function(itemStr) {
             const item = JSON.parse(decodeURIComponent(itemStr));
@@ -830,7 +1321,7 @@
                 gridEl.innerHTML = '';
 
                 favorites.forEach((item, index) => {
-                    const priceText = formatPrice(item.price, item.currency);
+                    const price = formatPrice(item.price, item.currency);
                     const card = document.createElement('div');
                     card.className = "group cursor-pointer animate-fade-up";
                     card.style.animationDelay = `${index * 0.05}s`;
@@ -848,143 +1339,55 @@
                             </button>
                         </div>
                         <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${item.title}</p>
-                        <p class="text-sm font-bold text-fashion">${priceText}</p>
+                        <p class="text-sm font-bold text-fashion">${price}</p>
                     `;
                     gridEl.appendChild(card);
                 });
             }
         }
 
-        function renderNoOutfitState(explanation, currentSourceMode) {
-            const resultsContainer = document.getElementById('results-container');
+        function formatPrice(price, currency = 'RUB') {
+            const normalizedCurrency = (currency || 'RUB').toUpperCase();
+            const numericPrice = Number(price);
+            if (!Number.isFinite(numericPrice)) return '';
 
-            resultsContainer.innerHTML = `
-                <div class="mb-4">
-                    <h3 class="text-lg font-semibold tracking-tight mb-3">Результат подбора</h3>
-                    <div class="outfit-note p-4 rounded-[1.5rem]">
-                        <p class="text-xs uppercase tracking-wider text-gray-400 mb-2">Источник: ${sourceModeLabel(currentSourceMode)}</p>
-                        <p class="text-sm text-gray-700 leading-relaxed">${explanation}</p>
-                    </div>
-                </div>
-            `;
+            const symbols = {
+                RUB: '₽',
+                USD: '$',
+                EUR: '€',
+                TRY: '₺'
+            };
 
-            resultsContainer.classList.remove('hidden');
+            const symbol = symbols[normalizedCurrency] || normalizedCurrency;
+            const formatted = Number.isInteger(numericPrice)
+                ? String(numericPrice)
+                : numericPrice.toFixed(2);
+
+            return `${formatted}${symbol}`;
         }
 
         document.getElementById('outfit-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
             const currentScenario = hiddenInput.value;
-            const currentSourceMode = sourceModeInput.value;
-            const currentGender = genderInput.value;
 
             if (!currentScenario) return;
-
-            const skeleton = document.getElementById('skeleton-loader');
             const resultsContainer = document.getElementById('results-container');
 
-            skeleton.classList.remove('hidden');
-            resultsContainer.classList.add('hidden');
-            resultsContainer.innerHTML = '';
-
-            try {
-                const response = await fetch('/api/generate_outfits', {
-                    method: 'POST',
-                    headers: ownerHeaders({ 'Content-Type': 'application/json' }),
-                    body: JSON.stringify({
-                        scenario: currentScenario,
-                        style: "Minimal",
-                        gender: currentGender,
-                        count: 1,
-                        source_mode: currentSourceMode
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error('HTTP error ' + response.status);
-                }
-
-                const data = await response.json();
-
-                if (!data.outfits || data.outfits.length === 0) {
-                    throw new Error("Сервер вернул пустой ответ");
-                }
-
-                const bestOutfit = data.outfits[0];
-                const aiExplanation = bestOutfit.explanation || "Не удалось подобрать образ.";
-
-                if (!bestOutfit.items || bestOutfit.items.length === 0) {
-                    renderNoOutfitState(aiExplanation, currentSourceMode);
-                    lastGeneratedScenario = currentScenario;
-                    updateButtonText();
-                    return;
-                }
-
-                let htmlContent = `
-                    <div class="mb-4">
-                        <h3 class="text-lg font-semibold tracking-tight mb-3">Выбор стилиста</h3>
-                        <div class="outfit-note p-4 rounded-[1.5rem]">
-                            <p class="text-xs uppercase tracking-wider text-gray-400 mb-2">Источник: ${sourceModeLabel(currentSourceMode)}</p>
-                            <p class="text-sm text-gray-700 italic leading-relaxed">«${aiExplanation}»</p>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-6">
-                `;
-
-                bestOutfit.items.forEach((item, index) => {
-                    if (!item.id) item.id = 'item_' + Math.random().toString(36).substr(2, 9);
-
-                    const isFav = favorites.some(f => f.id === item.id);
-                    const heartClass = isFav ? "text-red-500 fill-current" : "text-gray-400";
-                    const priceText = formatPrice(item.price, item.currency);
-                    const imgUrl = item.image_url ? item.image_url : `https://via.placeholder.com/400x500/eeeeee/999999?text=${item.category || 'clothes'}`;
-
-                    const safeItem = {
-                        id: item.id,
-                        title: item.title || 'Без названия',
-                        category: item.category || 'unknown',
-                        price: item.price,
-                        currency: item.currency || 'RUB',
-                        image_url: imgUrl
-                    };
-
-                    const itemDataStr = encodeURIComponent(JSON.stringify(safeItem));
-
-                    htmlContent += `
-                        <div class="group cursor-pointer animate-fade-up" style="animation-delay: ${index * 0.1}s">
-                            <div class="relative aspect-[4/5] bg-white/80 backdrop-blur overflow-hidden mb-3 rounded-[1.35rem] border border-white/80 shadow-[0_14px_32px_rgba(23,19,17,0.07)]">
-                                <img src="${imgUrl}" alt="${safeItem.title}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/400x500/eeeeee/999999?text=Error'">
-                                <button onclick="toggleFavorite(this, '${itemDataStr}')" class="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-sm transition-transform active:scale-75 ${heartClass}">
-                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                                        <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                            <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">${safeItem.category}</h4>
-                            <p class="text-sm font-semibold text-fashion leading-tight mb-1 line-clamp-1">${safeItem.title}</p>
-                            <p class="text-sm font-bold text-fashion">${priceText}</p>
-                        </div>
-                    `;
-                });
-
-                htmlContent += `</div>`;
-                resultsContainer.innerHTML = htmlContent;
-
-                lastGeneratedScenario = currentScenario;
-                updateButtonText();
-                resultsContainer.classList.remove('hidden');
-            } catch (error) {
-                console.error('Ошибка:', error);
+            if (selectedCompletionIds.size < 1 || selectedCompletionIds.size > 2) {
                 resultsContainer.innerHTML = `
                     <div class="outfit-note p-4 rounded-[1.4rem]">
-                        <p class="text-red-600 text-sm font-bold mb-1">Сбой связи со стилистом:</p>
-                        <p class="text-red-500 text-xs break-words">${error.message}</p>
+                        <p class="text-sm font-semibold text-fashion mb-2">Completion-first flow</p>
+                        <p class="text-xs text-gray-600 leading-relaxed">Сначала перейди во вкладку “Гардероб”, нажми “Дособрать” и выбери 1–2 anchor-вещи. После этого StyleMate доберёт недостающие позиции из каталога под выбранный сценарий.</p>
                     </div>
                 `;
                 resultsContainer.classList.remove('hidden');
-            } finally {
-                skeleton.classList.add('hidden');
+                switchTab('wardrobe');
+                toggleCompletionSelectionMode(true);
+                return;
             }
+
+            await requestOutfitCompletion();
         });
 
         window.handleUpload = async (e) => {
@@ -1028,11 +1431,23 @@
             }
         };
 
-        updateButtonText();
+        async function initApp() {
+            try {
+                await bootstrapSession();
+                await fetchProfile();
+            } catch (error) {
+                console.error('Ошибка инициализации сессии:', error);
+                setProfileStatus('Не удалось инициализировать профиль.', true);
+            }
 
-        if (document.getElementById('tab-wardrobe').classList.contains('active')) {
-            loadMyWardrobe();
+            updateButtonText();
+
+            if (document.getElementById('tab-wardrobe').classList.contains('active')) {
+                await loadMyWardrobe();
+            }
         }
+
+        initApp();
     </script>
 </body>
 </html>

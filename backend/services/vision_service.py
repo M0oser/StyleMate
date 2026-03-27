@@ -8,6 +8,9 @@ from backend.services.vision_local import (
     analyze_image_local,
     save_analysis_json,
 )
+from backend.services.vision_mlx import analyze_image_mlx
+from backend.services.vision_ollama import analyze_image_ollama
+from backend.services.vision_llm import analyze_image_llm
 
 
 def _remote_headers() -> Dict[str, str]:
@@ -63,18 +66,74 @@ async def analyze_uploaded_clothing(
     vision_api_url = os.getenv("VISION_API_URL", "https://stylemate2026.loca.lt/")
 
     last_error = None
+    print(f"[VISION] mode={mode}")
+
+    if mode in {"mlx", "auto"}:
+        try:
+            print("[VISION] trying mlx")
+            analysis = await analyze_image_mlx(
+                image_bytes=image_bytes,
+                filename=filename,
+                content_type=content_type,
+            )
+            save_analysis_json(analysis, json_output_path)
+            print("[VISION] mlx succeeded")
+            return analysis, "mlx"
+        except Exception as e:
+            last_error = e
+            print(f"[VISION] mlx failed: {type(e).__name__}: {e}")
+            if mode == "mlx":
+                raise
+
+    if mode in {"ollama", "auto"}:
+        try:
+            print("[VISION] trying ollama")
+            analysis = await analyze_image_ollama(
+                image_bytes=image_bytes,
+                filename=filename,
+                content_type=content_type,
+            )
+            save_analysis_json(analysis, json_output_path)
+            print("[VISION] ollama succeeded")
+            return analysis, "ollama"
+        except Exception as e:
+            last_error = e
+            print(f"[VISION] ollama failed: {type(e).__name__}: {e}")
+            if mode == "ollama":
+                raise
 
     if mode in {"local", "auto"}:
         try:
+            print("[VISION] trying local")
             analysis = analyze_image_local(image_path).to_dict()
             save_analysis_json(analysis, json_output_path)
+            print("[VISION] local succeeded")
             return analysis, "local"
         except Exception as e:
             last_error = e
+            print(f"[VISION] local failed: {type(e).__name__}: {e}")
             if mode == "local":
                 raise
 
+    if mode in {"llm", "auto"}:
+        try:
+            print("[VISION] trying llm")
+            analysis = await analyze_image_llm(
+                image_bytes=image_bytes,
+                filename=filename,
+                content_type=content_type,
+            )
+            save_analysis_json(analysis, json_output_path)
+            print("[VISION] llm succeeded")
+            return analysis, "llm"
+        except Exception as e:
+            last_error = e
+            print(f"[VISION] llm failed: {type(e).__name__}: {e}")
+            if mode == "llm":
+                raise
+
     if mode in {"remote", "auto"}:
+        print("[VISION] trying remote")
         analysis = await analyze_image_remote(
             image_bytes=image_bytes,
             filename=filename,
@@ -82,6 +141,7 @@ async def analyze_uploaded_clothing(
             vision_api_url=vision_api_url,
         )
         save_analysis_json(analysis, json_output_path)
+        print("[VISION] remote succeeded")
         return analysis, "remote"
 
     raise LocalVisionUnavailable(f"Unsupported VISION_MODE={mode}; last_error={last_error}")

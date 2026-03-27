@@ -150,21 +150,21 @@ def infer_subcategory(category: str, text: str) -> str:
 
 
 def infer_feature_flags(text: str, category: str, material_tags: list[str], purpose_tags: list[str]) -> Dict[str, Any]:
+    pocket_mentions = text.count("pocket") + text.count("карман")
+    cargo = _contains_any(text, FEATURE_KEYWORDS["cargo"])
+    utility_signal = (
+        "utility" in text
+        or "multi-pocket" in text
+        or "multiple pockets" in text
+        or cargo
+    )
     hooded = _contains_any(text, FEATURE_KEYWORDS["hooded"])
     waterproof = _contains_any(text, FEATURE_KEYWORDS["waterproof"])
     water_resistant = waterproof or _contains_any(text, FEATURE_KEYWORDS["water_resistant"])
     windproof = _contains_any(text, FEATURE_KEYWORDS["windproof"]) or (category in {"jacket", "coat"} and ("outdoor" in purpose_tags or water_resistant))
     insulated = _contains_any(text, FEATURE_KEYWORDS["insulated"]) or any(tag in material_tags for tag in {"fleece", "down", "wool"})
     technical = _contains_any(text, FEATURE_KEYWORDS["technical"]) or "outdoor" in purpose_tags
-    many_pockets = (
-        "cargo" in text
-        or "карго" in text
-        or "utility" in text
-        or "multi-pocket" in text
-        or "multiple pockets" in text
-        or text.count("pocket") >= 1
-        or text.count("карман") >= 1
-    )
+    many_pockets = utility_signal or pocket_mentions >= 2
     breathable = _contains_any(text, FEATURE_KEYWORDS["breathable"])
     adjustable = _contains_any(text, FEATURE_KEYWORDS["adjustable"])
     quilted = _contains_any(text, FEATURE_KEYWORDS["quilted"])
@@ -177,16 +177,14 @@ def infer_feature_flags(text: str, category: str, material_tags: list[str], purp
     packable = _contains_any(text, FEATURE_KEYWORDS["packable"])
     lined = _contains_any(text, FEATURE_KEYWORDS["lined"])
     reinforced = _contains_any(text, FEATURE_KEYWORDS["reinforced"])
-    cargo = _contains_any(text, FEATURE_KEYWORDS["cargo"])
     storm_ready = _contains_any(text, FEATURE_KEYWORDS["storm_ready"]) or (
         water_resistant and windproof and category in {"jacket", "coat", "boots"}
     )
 
-    pocket_mentions = text.count("pocket") + text.count("карман")
     pocket_level = "low"
-    if many_pockets or cargo or "utility" in text:
+    if many_pockets:
         pocket_level = "high"
-    elif pocket_mentions >= 1 or category in {"jacket", "coat", "trousers", "shorts"}:
+    elif pocket_mentions >= 1:
         pocket_level = "medium"
 
     return {
@@ -234,9 +232,19 @@ def infer_usecase_tags(text: str, category: str, style: str, feature_flags: Dict
         tags.add("winter")
     if feature_flags["breathable"] or (weather_tags and "hot" in weather_tags):
         tags.add("summer")
-    if category in {"shirt", "trousers", "shoes", "coat"} and style in {"formal", "casual"}:
+    office_compatible = not (
+        feature_flags["technical"]
+        or feature_flags["cargo"]
+        or "outdoor" in tags
+        or "hiking" in tags
+    )
+    if category in {"shirt", "trousers", "shoes", "coat"} and style in {"formal", "casual"} and office_compatible:
         tags.add("office")
-    if feature_flags["many_pockets"] and (feature_flags["water_resistant"] or feature_flags["technical"] or category in {"jacket", "coat", "trousers", "boots"}):
+    if feature_flags["many_pockets"] and (
+        feature_flags["water_resistant"]
+        or feature_flags["technical"]
+        or _contains_any(text, {"fishing", "рыбал", "outdoor", "trail", "hiking", "utility"})
+    ):
         tags.add("fishing")
     if feature_flags["many_pockets"]:
         tags.add("utility")

@@ -20,7 +20,35 @@ ALLOWED_CATEGORIES = {
 }
 
 
-def get_catalog(limit=None, offset=0, category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None, usecase_tag=None, feature_tag=None, material_tag=None, subcategory=None, hooded=None, waterproof=None, windproof=None, insulated=None, technical=None, many_pockets=None, pocket_level=None):
+def get_catalog(
+    limit=None,
+    offset=0,
+    category=None,
+    source=None,
+    query=None,
+    gender=None,
+    style=None,
+    warmth=None,
+    weather_tag=None,
+    weather_profile=None,
+    water_resistant=None,
+    weather_rain=None,
+    weather_wind=None,
+    weather_snow=None,
+    weather_heat=None,
+    purpose_tag=None,
+    usecase_tag=None,
+    feature_tag=None,
+    material_tag=None,
+    subcategory=None,
+    hooded=None,
+    waterproof=None,
+    windproof=None,
+    insulated=None,
+    technical=None,
+    many_pockets=None,
+    pocket_level=None,
+):
     if category and category not in ALLOWED_CATEGORIES:
         raise ValueError("Unsupported category")
 
@@ -55,7 +83,33 @@ def get_catalog(limit=None, offset=0, category=None, source=None, query=None, ge
     )
 
 
-def get_catalog_total(category=None, source=None, query=None, gender=None, style=None, warmth=None, weather_tag=None, weather_profile=None, water_resistant=None, weather_rain=None, weather_wind=None, weather_snow=None, weather_heat=None, purpose_tag=None, usecase_tag=None, feature_tag=None, material_tag=None, subcategory=None, hooded=None, waterproof=None, windproof=None, insulated=None, technical=None, many_pockets=None, pocket_level=None):
+def get_catalog_total(
+    category=None,
+    source=None,
+    query=None,
+    gender=None,
+    style=None,
+    warmth=None,
+    weather_tag=None,
+    weather_profile=None,
+    water_resistant=None,
+    weather_rain=None,
+    weather_wind=None,
+    weather_snow=None,
+    weather_heat=None,
+    purpose_tag=None,
+    usecase_tag=None,
+    feature_tag=None,
+    material_tag=None,
+    subcategory=None,
+    hooded=None,
+    waterproof=None,
+    windproof=None,
+    insulated=None,
+    technical=None,
+    many_pockets=None,
+    pocket_level=None,
+):
     if category and category not in ALLOWED_CATEGORIES:
         raise ValueError("Unsupported category")
     return count_catalog_items(

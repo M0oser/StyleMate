@@ -82,13 +82,19 @@ SCENARIO_RULES: Dict[str, Dict] = {
     "mountains": {
         "keywords": [
             "горы", "поход в горы", "в горы", "hiking", "треккинг",
-            "поход", "на природу", "в лес", "outdoor", "camping"
+            "поход", "на природу", "в лес", "outdoor", "camping",
+            "лыжи", "лыжах", "лыжная прогулка", "кататься на лыжах",
+            "ski", "skiing", "snowboard", "snowboarding", "горнолыж",
+            "сноуборд", "склон", "зимний курорт", "apres ski"
         ],
         "required_categories": [],
-        "preferred_categories": ["hoodie", "jacket", "boots", "sneakers", "trousers"],
+        "preferred_categories": ["sweater", "hoodie", "jacket", "coat", "boots", "trousers"],
         "forbidden_categories": ["loafers", "shoes"],
-        "forbidden_keywords": ["leather", "formal", "derby"],
-        "preferred_keywords": ["rugged", "outdoor", "boot", "utility", "technical"],
+        "forbidden_keywords": ["leather", "formal", "derby", "linen", "lightweight"],
+        "preferred_keywords": [
+            "rugged", "outdoor", "boot", "utility", "technical",
+            "ski", "snow", "thermal", "fleece", "waterproof", "insulated"
+        ],
     },
     "water_park": {
         "keywords": [
@@ -137,13 +143,15 @@ SCENARIO_RULES: Dict[str, Dict] = {
     "cold_weather": {
         "keywords": [
             "холодно", "зимой", "осенью", "в холод", "winter", "autumn",
-            "в мороз", "прохладно", "мерзну", "замерз", "ветрено", "ветер"
+            "в мороз", "прохладно", "мерзну", "замерз", "ветрено", "ветер",
+            "снег", "снежно", "лыжи", "лыжах", "ski", "snow", "snowboard",
+            "сноуборд", "зимняя прогулка"
         ],
         "required_categories": [],
         "preferred_categories": ["sweater", "hoodie", "coat", "jacket", "boots", "trousers"],
         "forbidden_categories": ["shorts"],
-        "forbidden_keywords": ["lightweight"],
-        "preferred_keywords": ["wool", "knit", "coat", "boot"],
+        "forbidden_keywords": ["lightweight", "linen"],
+        "preferred_keywords": ["wool", "knit", "coat", "boot", "thermal", "fleece", "insulated"],
     },
     "generic": {
         "keywords": [
@@ -169,6 +177,12 @@ TYPO_MAP = {
     "кэжуал": "casual",
     "спортзальчик": "спортзал",
     "зальчик": "зал",
+    "альпы": "горы снег",
+    "альпах": "горы снег",
+    "alps": "mountains snow",
+    "alpine": "mountains snow",
+    "out door": "outdoor",
+    "badweather": "bad weather",
 }
 
 
@@ -273,11 +287,27 @@ def sanitize_text(text: str) -> str:
     for wrong, fixed in TYPO_MAP.items():
         s = s.replace(wrong, fixed)
 
+    alias_injections = []
+    if any(token in s for token in ["альпы", "альп", "alps", "alpine"]):
+        alias_injections.extend(["горы", "лыжи", "snow"])
+    if any(token in s for token in ["северный полюс", "north pole", "arctic", "polar", "поляр"]):
+        alias_injections.extend(["мороз", "снег", "зимой", "горы"])
+    if any(token in s for token in ["bad weather", "плохая погода", "шторм", "storm"]):
+        alias_injections.extend(["дождь", "ветер", "непогода"])
+    if any(token in s for token in ["рыбалка", "рыбалку", "fishing"]):
+        alias_injections.extend(["outdoor", "дождь"])
+    if any(token in s for token in ["outdoor", "trail", "hiking", "trekking", "треккинг"]):
+        alias_injections.extend(["горы", "поход"])
+
+    if alias_injections:
+        s = f"{s} {' '.join(alias_injections)}"
+
     return s
 
 
 def _match_profiles(clean_text: str) -> Dict[str, int]:
     scores: Dict[str, int] = {}
+    bounded_text = f" {clean_text} "
 
     for rule_name, rule in SCENARIO_RULES.items():
         if rule_name == "generic":
@@ -285,7 +315,8 @@ def _match_profiles(clean_text: str) -> Dict[str, int]:
 
         score = 0
         for kw in rule["keywords"]:
-            if kw in clean_text:
+            normalized_kw = f" {kw.strip()} "
+            if normalized_kw in bounded_text:
                 score += max(1, len(kw.split()))
 
         if score > 0:
@@ -307,11 +338,13 @@ def _detect_conflicts(matched_profiles: List[str]) -> List[str]:
 
 def _detect_formality(clean_text: str, profile: str) -> Dict:
     scores: Dict[str, int] = {}
+    bounded_text = f" {clean_text} "
 
     for level, keywords in FORMALITY_RULES.items():
         score = 0
         for kw in keywords:
-            if kw in clean_text:
+            normalized_kw = f" {kw.strip()} "
+            if normalized_kw in bounded_text:
                 score += max(1, len(kw.split()))
         if score > 0:
             scores[level] = score

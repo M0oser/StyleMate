@@ -1,30 +1,46 @@
 import os
 import uuid
-import sqlite3
 from typing import Optional
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, File, UploadFile, Request
+from fastapi import FastAPI, HTTPException, File, UploadFile, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from backend.services.outfit_generator import (
-    clear_user_wardrobe,
-    delete_user_wardrobe_items,
-    ensure_user_wardrobe_schema,
-    normalize_owner_token,
-    load_wardrobe_from_db,
-    insert_user_wardrobe_item,
-    update_user_wardrobe_item,
+from backend.contracts import (
+    CompletionRequestDTO,
+    build_error_response,
+    build_meta_response,
+    serialize_completion_response,
 )
-from backend.services.rag_agent import generate_outfit_via_llm
+from backend.examples import build_completion_examples_payload
+from backend.services.pg_wardrobe_bridge import (
+    clear_pg_wardrobe,
+    create_pg_wardrobe_item,
+    delete_pg_wardrobe_items,
+    list_pg_wardrobe,
+    update_pg_wardrobe_item,
+)
+from backend.services.profile_service import (
+    bootstrap_session,
+    get_profile,
+    record_feedback,
+    save_profile,
+)
+from backend.services.image_preprocess import normalize_upload_image
 from backend.services.vision_service import analyze_uploaded_clothing
+from database.db import (
+    get_repository,
+    init_postgres_db,
+    stable_user_id_from_owner_token,
+)
+from services.completion_errors import CompletionAPIError
+from services.completion_service import CompletionService
 
-load_dotenv(override=True)
-ensure_user_wardrobe_schema()
+load_dotenv(override=False)
 
 app = FastAPI(title="StyleMate API")
 
@@ -35,14 +51,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-class OutfitRequest(BaseModel):
-    scenario: str
-    style: str
-    gender: str = "male"
-    count: int = 1
-    source_mode: str = "mixed"
 
 
 class WardrobeItemUpdateRequest(BaseModel):
@@ -56,8 +64,31 @@ class WardrobeDeleteRequest(BaseModel):
     item_ids: list[int]
 
 
+class ProfileUpdateRequest(BaseModel):
+    display_name: Optional[str] = None
+    gender: Optional[str] = None
+    style_preferences: Optional[list[str]] = None
+    onboarding_completed: Optional[bool] = None
+
+
+class FeedbackItemPayload(BaseModel):
+    title: Optional[str] = None
+    category: Optional[str] = None
+    color: Optional[str] = None
+    style: Optional[str] = None
+    warmth: Optional[str] = None
+    source: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    feedback: str
+    items: list[FeedbackItemPayload]
+    scenario: Optional[str] = None
+    style: Optional[str] = None
+
+
 def _get_owner_token(request: Request, required: bool = True) -> Optional[str]:
-    owner_token = normalize_owner_token(request.headers.get("X-Owner-Token"))
+    owner_token = str(request.headers.get("X-Owner-Token") or "").strip() or None
 
     if required and not owner_token:
         raise HTTPException(status_code=400, detail="Missing X-Owner-Token header")
@@ -66,6 +97,19 @@ def _get_owner_token(request: Request, required: bool = True) -> Optional[str]:
 
 
 app.mount("/static", StaticFiles(directory="frontend_tma"), name="static")
+
+
+def _safe_init_postgres_completion_stack() -> None:
+    try:
+        init_postgres_db()
+        print("[PG_COMPLETION] PostgreSQL completion stack initialized")
+    except Exception as e:
+        print(f"[PG_COMPLETION] PostgreSQL completion stack unavailable: {e}")
+
+
+@app.on_event("startup")
+async def startup_event():
+    _safe_init_postgres_completion_stack()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -86,91 +130,143 @@ async def health_check():
     return {"status": "ok", "message": "StyleMate Backend is running!"}
 
 
+def _build_completion_public_response(
+    request: CompletionRequestDTO,
+    *,
+    include_debug: bool,
+) -> dict:
+    internal_payload = CompletionService(repository=get_repository()).generate_completion(**request.model_dump())
+    return serialize_completion_response(
+        internal_payload,
+        include_debug=include_debug,
+    )
+
+
+@app.get("/api/v1/meta")
+async def api_v1_meta():
+    return build_meta_response()
+
+
+@app.get("/api/v1/meta/scenarios")
+async def api_v1_meta_scenarios():
+    payload = build_meta_response()
+    return {"api_version": payload["api_version"], "scenarios": payload["scenarios"]}
+
+
+@app.get("/api/v1/meta/roles")
+async def api_v1_meta_roles():
+    payload = build_meta_response()
+    return {"api_version": payload["api_version"], "roles": payload["roles"]}
+
+
+@app.get("/api/v1/examples/completion")
+async def api_v1_completion_examples():
+    return build_completion_examples_payload()
+
+
+@app.post("/api/v1/completion")
+@app.post("/api/completion", include_in_schema=False)
+async def api_v1_completion(
+    req: CompletionRequestDTO,
+    request: Request,
+    include_debug: bool = Query(default=False),
+):
+    try:
+        owner_token = _get_owner_token(request, required=False)
+        resolved_user_id = req.user_id
+        if owner_token:
+            resolved_user_id = stable_user_id_from_owner_token(owner_token)
+        elif resolved_user_id is None:
+            raise HTTPException(status_code=400, detail="Missing X-Owner-Token header or user_id")
+
+        resolved_req = req.model_copy(update={"user_id": resolved_user_id})
+        return _build_completion_public_response(resolved_req, include_debug=include_debug)
+    except HTTPException:
+        raise
+    except CompletionAPIError as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content=build_error_response(
+                code=e.code,
+                message=e.message,
+                details=e.details,
+            ),
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content=build_error_response(
+                code="INTERNAL_ERROR",
+                message="Unexpected backend error.",
+                details={"reason": str(e)},
+            ),
+        )
+
+
 @app.post("/api/generate_outfits")
-async def api_generate_outfits(req: OutfitRequest, request: Request):
-    owner_token = _get_owner_token(request, required=req.source_mode in {"user", "mixed"})
-
-    wardrobe = load_wardrobe_from_db(
-        db_path="database/wardrobe.db",
-        source_mode=req.source_mode,
-        limit=2000,
-        owner_token=owner_token,
+async def api_generate_outfits():
+    return JSONResponse(
+        status_code=410,
+        content={
+            "status": "deprecated",
+            "message": "Legacy full outfit generation has been retired. Use completion-first flow via /api/v1/completion.",
+        },
     )
 
-    if not wardrobe:
-        raise HTTPException(status_code=404, detail="Wardrobe is empty")
+@app.post("/api/auth/session")
+async def api_auth_session(request: Request):
+    owner_token = _get_owner_token(request)
+    return bootstrap_session(owner_token)
 
-    wardrobe_view = [
-        {
-            "id": x.id,
-            "title": x.title,
-            "category": x.cat,
-            "color": x.color,
-            "price": x.price,
-            "currency": x.currency,
-            "image_url": x.image_url,
-            "url": x.url,
-            "source": x.source,
-            "gender": x.gender,
-            "style": x.style,
-            "warmth": x.warmth,
-            "weather_tags": x.weather_tags,
-            "weather_profiles": x.weather_profiles,
-            "purpose_tags": x.purpose_tags,
-            "subcategory": x.subcategory,
-            "material_tags": x.material_tags,
-            "fit_tags": x.fit_tags,
-            "feature_tags": x.feature_tags,
-            "usecase_tags": x.usecase_tags,
-            "hooded": x.hooded,
-            "waterproof": x.waterproof,
-            "windproof": x.windproof,
-            "insulated": x.insulated,
-            "technical": x.technical,
-            "many_pockets": x.many_pockets,
-            "pocket_level": x.pocket_level,
-        }
-        for x in wardrobe
-        if x.cat != "accessory"
-    ]
 
-    print(
-        f"[API] generate_outfits scenario={req.scenario} "
-        f"style={req.style} gender={req.gender} source_mode={req.source_mode}"
-    )
-    print("[API] wardrobe_view categories:", [item["category"] for item in wardrobe_view])
+@app.get("/api/profile")
+async def api_get_profile(request: Request):
+    owner_token = _get_owner_token(request)
+    return {"profile": get_profile(owner_token)}
 
-    llm_response = generate_outfit_via_llm(wardrobe_view, req.scenario, req.style, req.gender)
 
-    outfit_items = llm_response.get("items", [])
-    explanation = llm_response.get("explanation", "Мой выбор для тебя")
+@app.patch("/api/profile")
+async def api_patch_profile(req: ProfileUpdateRequest, request: Request):
+    owner_token = _get_owner_token(request)
 
-    if not outfit_items:
-        print("[API] Подходящий лук не найден. Возвращаем пустой результат без случайного fallback.")
-        return {
-            "scenario": req.scenario,
-            "style": req.style,
-            "gender": req.gender,
-            "source_mode": req.source_mode,
-            "outfits": [{
-                "score": 0,
-                "explanation": explanation,
-                "items": []
-            }]
-        }
+    try:
+        profile = save_profile(
+            owner_token,
+            display_name=req.display_name,
+            gender=req.gender,
+            style_preferences=req.style_preferences,
+            onboarding_completed=req.onboarding_completed,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
-    result = [{
-        "score": 100,
-        "explanation": explanation,
-        "items": outfit_items
-    }]
+    return {"profile": profile}
+
+
+@app.post("/api/feedback")
+async def api_feedback(req: FeedbackRequest, request: Request):
+    owner_token = _get_owner_token(request)
+
+    try:
+        payload_items = [
+            item.model_dump() if hasattr(item, "model_dump") else item.dict()
+            for item in req.items
+        ]
+        result = record_feedback(
+            owner_token,
+            feedback=req.feedback,
+            items=payload_items,
+            scenario=req.scenario,
+            requested_style=req.style,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
     return {
-        "scenario": req.scenario,
-        "style": req.style,
-        "gender": req.gender,
-        "source_mode": req.source_mode,
-        "outfits": result
+        "status": "success",
+        "saved_feedback": result["saved_feedback"],
+        "feedback_summary": result["feedback_summary"],
+        "style_preference_context": result["style_preference_context"],
     }
 
 
@@ -179,31 +275,7 @@ async def get_my_wardrobe(request: Request):
     owner_token = _get_owner_token(request)
 
     try:
-        ensure_user_wardrobe_schema()
-        con = sqlite3.connect("database/wardrobe.db")
-        cur = con.cursor()
-        cur.execute("""
-            SELECT id, title, category, color, image_url, style, vision_source, manually_edited
-            FROM user_wardrobe
-            WHERE owner_token = ?
-            ORDER BY id DESC
-        """, (owner_token,))
-        rows = cur.fetchall()
-        con.close()
-
-        items = []
-        for r in rows:
-            items.append({
-                "id": r[0],
-                "title": r[1],
-                "category": r[2],
-                "color": r[3],
-                "image_url": r[4],
-                "style": r[5],
-                "vision_source": r[6],
-                "manually_edited": bool(r[7]),
-            })
-        return items
+        return list_pg_wardrobe(owner_token)
     except Exception as e:
         print(f"[WARDROBE] Ошибка при получении гардероба: {e}")
         return []
@@ -212,14 +284,13 @@ async def get_my_wardrobe(request: Request):
 @app.put("/api/my_wardrobe/{item_id}")
 async def update_my_wardrobe_item(item_id: int, req: WardrobeItemUpdateRequest, request: Request):
     owner_token = _get_owner_token(request)
-    updated = update_user_wardrobe_item(
+    updated = update_pg_wardrobe_item(
+        owner_token=owner_token,
         item_id=item_id,
         title=req.title,
         category=req.category,
         color=req.color,
         style=req.style,
-        owner_token=owner_token,
-        db_path="database/wardrobe.db",
     )
 
     if not updated:
@@ -231,7 +302,7 @@ async def update_my_wardrobe_item(item_id: int, req: WardrobeItemUpdateRequest, 
 @app.delete("/api/my_wardrobe/{item_id}")
 async def delete_my_wardrobe_item(item_id: int, request: Request):
     owner_token = _get_owner_token(request)
-    deleted_count = delete_user_wardrobe_items([item_id], owner_token=owner_token, db_path="database/wardrobe.db")
+    deleted_count = delete_pg_wardrobe_items(item_ids=[item_id], owner_token=owner_token)
 
     if deleted_count == 0:
         raise HTTPException(status_code=404, detail="Wardrobe item not found")
@@ -242,14 +313,14 @@ async def delete_my_wardrobe_item(item_id: int, request: Request):
 @app.post("/api/my_wardrobe/bulk_delete")
 async def bulk_delete_my_wardrobe_items(req: WardrobeDeleteRequest, request: Request):
     owner_token = _get_owner_token(request)
-    deleted_count = delete_user_wardrobe_items(req.item_ids, owner_token=owner_token, db_path="database/wardrobe.db")
+    deleted_count = delete_pg_wardrobe_items(item_ids=req.item_ids, owner_token=owner_token)
     return {"status": "success", "deleted_count": deleted_count}
 
 
 @app.delete("/api/my_wardrobe")
 async def delete_all_my_wardrobe_items(request: Request):
     owner_token = _get_owner_token(request)
-    deleted_count = clear_user_wardrobe(db_path="database/wardrobe.db", owner_token=owner_token)
+    deleted_count = clear_pg_wardrobe(owner_token=owner_token)
     return {"status": "success", "deleted_count": deleted_count}
 
 
@@ -259,16 +330,15 @@ def _safe_insert_unknown_item(
     vision_payload_path: Optional[str] = None,
 ) -> None:
     try:
-        insert_user_wardrobe_item(
+        create_pg_wardrobe_item(
+            owner_token=owner_token,
             title="Новая вещь",
             category="unknown",
             color="unknown",
             style="unknown",
             image_url=image_url,
             vision_source="fallback",
-            vision_payload={"category": "unknown", "color": "unknown", "style": "unknown"},
             vision_payload_path=vision_payload_path,
-            owner_token=owner_token,
         )
     except Exception as e:
         print(f"[UPLOAD] Не удалось сохранить unknown item: {e}")
@@ -286,13 +356,19 @@ async def upload_clothing(request: Request, file: UploadFile = File(...)):
         if not image_bytes:
             return {"status": "error", "message": "Файл пустой"}
 
-        file_ext = file.filename.split(".")[-1].lower() if file.filename and "." in file.filename else "jpg"
+        normalized_bytes, normalized_filename, normalized_content_type = normalize_upload_image(
+            image_bytes=image_bytes,
+            filename=file.filename or "upload.jpg",
+            content_type=file.content_type or "image/jpeg",
+        )
+
+        file_ext = normalized_filename.split(".")[-1].lower() if "." in normalized_filename else "jpg"
         unique_filename = f"{uuid.uuid4().hex}.{file_ext}"
         os.makedirs(os.path.join("frontend_tma", "uploads"), exist_ok=True)
         save_path = os.path.join("frontend_tma", "uploads", unique_filename)
 
         with open(save_path, "wb") as f:
-            f.write(image_bytes)
+            f.write(normalized_bytes)
 
         public_image_url = f"/static/uploads/{unique_filename}"
         meta_dir = os.path.join("frontend_tma", "uploads", "meta")
@@ -303,9 +379,9 @@ async def upload_clothing(request: Request, file: UploadFile = File(...)):
 
         ai_data, vision_source = await analyze_uploaded_clothing(
             image_path=save_path,
-            image_bytes=image_bytes,
-            filename=file.filename or f"upload.{file_ext}",
-            content_type=file.content_type or "image/jpeg",
+            image_bytes=normalized_bytes,
+            filename=normalized_filename,
+            content_type=normalized_content_type,
             json_output_path=vision_json_path,
         )
 
@@ -323,16 +399,15 @@ async def upload_clothing(request: Request, file: UploadFile = File(...)):
 
         new_title = title or f"{col.capitalize()} {cat.capitalize()}"
 
-        new_id = insert_user_wardrobe_item(
+        new_id = create_pg_wardrobe_item(
+            owner_token=owner_token,
             title=new_title,
             category=cat,
             color=col,
             style=style,
             image_url=public_image_url,
             vision_source=vision_source,
-            vision_payload=ai_data,
             vision_payload_path=vision_json_path,
-            owner_token=owner_token,
         )
 
         print(f"[UPLOAD] ✅ Успешно: {new_title} ({cat}, {col}, {style})")
@@ -372,6 +447,10 @@ async def upload_clothing(request: Request, file: UploadFile = File(...)):
 
     except Exception as e:
         print(f"[UPLOAD] Критическая ошибка: {type(e).__name__}: {e}")
+        if vision_json_path:
+            print(f"[UPLOAD] vision_json_path={vision_json_path}")
+        if public_image_url:
+            print(f"[UPLOAD] public_image_url={public_image_url}")
         if public_image_url:
             _safe_insert_unknown_item(public_image_url, owner_token, vision_json_path)
         return {

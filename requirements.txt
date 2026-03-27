@@ -6,5 +6,7 @@ python-dotenv
 pillow
 requests
 beautifulsoup4
+psycopg[binary]
 torch
 open-clip-torch
+mlx-vlm
